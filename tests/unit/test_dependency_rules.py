@@ -6,7 +6,6 @@
 """
 
 import ast
-import os
 from pathlib import Path
 
 BACKEND_ROOT = Path(__file__).parent.parent.parent / "backend"
@@ -31,9 +30,8 @@ def _collect_imports(filepath: Path) -> list[str]:
         if isinstance(node, ast.Import):
             for alias in node.names:
                 imports.append(alias.name)
-        elif isinstance(node, ast.ImportFrom):
-            if node.module:
-                imports.append(node.module)
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            imports.append(node.module)
     return imports
 
 
@@ -54,6 +52,4 @@ def test_no_direct_store_imports():
                         rel_path = py_file.relative_to(BACKEND_ROOT.parent)
                         violations.append(f"{rel_path}: imports {imp}")
 
-    assert violations == [], (
-        "依存方向違反を検出:\n" + "\n".join(f"  - {v}" for v in violations)
-    )
+    assert violations == [], "依存方向違反を検出:\n" + "\n".join(f"  - {v}" for v in violations)

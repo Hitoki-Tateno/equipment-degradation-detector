@@ -17,12 +17,12 @@ from backend.interfaces.data_store import DataStoreInterface, WorkRecord
 
 
 @pytest.fixture
-def data_store():
-    """Store層の実装インスタンスを返す。
+def data_store(tmp_path):
+    """Store層の実装インスタンスを返す。"""
+    from backend.store.sqlite import SqliteDataStore
 
-    TODO: SQLite実装が完成したらここを差し替える。
-    """
-    pytest.skip("Store層の実装が未完成")
+    db_path = tmp_path / "test.db"
+    return SqliteDataStore(str(db_path))
 
 
 class TestUpsertRecords:
@@ -46,8 +46,12 @@ class TestUpsertRecords:
         category_id = data_store.ensure_category_path(["プロセスA", "設備1"])
         ts = datetime(2025, 1, 1)
 
-        data_store.upsert_records([WorkRecord(category_id=category_id, work_time=10.0, recorded_at=ts)])
-        data_store.upsert_records([WorkRecord(category_id=category_id, work_time=20.0, recorded_at=ts)])
+        data_store.upsert_records(
+            [WorkRecord(category_id=category_id, work_time=10.0, recorded_at=ts)]
+        )
+        data_store.upsert_records(
+            [WorkRecord(category_id=category_id, work_time=20.0, recorded_at=ts)]
+        )
 
         result = data_store.get_records(category_id)
         assert len(result) == 1

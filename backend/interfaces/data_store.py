@@ -5,8 +5,8 @@ Store層は正規化データの永続化と検索を担う。
 """
 
 from abc import ABC, abstractmethod
-from datetime import datetime
 from dataclasses import dataclass
+from datetime import datetime
 
 
 @dataclass(frozen=True)
