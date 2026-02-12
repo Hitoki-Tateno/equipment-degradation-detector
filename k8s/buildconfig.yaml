@@ -1,0 +1,23 @@
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: equipment-detector-build
+  namespace: equipment-detector
+  labels:
+    app.kubernetes.io/name: equipment-degradation-detector
+spec:
+  source:
+    type: Git
+    git:
+      uri: "https://your-git-repo-url.git"  # TODO: 実際のリポジトリURLに変更
+      ref: main
+  strategy:
+    type: Docker
+    dockerStrategy:
+      dockerfilePath: Containerfile
+  output:
+    to:
+      kind: ImageStreamTag
+      name: equipment-degradation-detector:latest
+  triggers:
+    - type: ConfigChange

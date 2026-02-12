@@ -1,0 +1,10 @@
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: equipment-degradation-detector
+  namespace: equipment-detector
+  labels:
+    app.kubernetes.io/name: equipment-degradation-detector
+spec:
+  lookupPolicy:
+    local: true

@@ -1,0 +1,42 @@
+{
+  "name": "設備劣化検知システム - Dev",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "args": {
+      "HTTP_PROXY": "${localEnv:HTTP_PROXY}",
+      "HTTPS_PROXY": "${localEnv:HTTPS_PROXY}",
+      "NO_PROXY": "${localEnv:NO_PROXY}"
+    }
+  },
+  "containerEnv": {
+    "HTTP_PROXY": "${localEnv:HTTP_PROXY}",
+    "HTTPS_PROXY": "${localEnv:HTTPS_PROXY}",
+    "NO_PROXY": "${localEnv:NO_PROXY}",
+    "http_proxy": "${localEnv:HTTP_PROXY}",
+    "https_proxy": "${localEnv:HTTPS_PROXY}",
+    "no_proxy": "${localEnv:NO_PROXY}",
+    "ANTHROPIC_API_KEY": "${localEnv:ANTHROPIC_API_KEY}"
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/git:1": {}
+  },
+  "postCreateCommand": "uv sync && cd frontend && npm install",
+  "postStartCommand": "gh auth status || echo '⚠️ gh auth login でGitHubに認証してください'",
+  "forwardPorts": [3000, 8000],
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python",
+        "[python]": {
+          "editor.defaultFormatter": "charliermarsh.ruff",
+          "editor.formatOnSave": true
+        }
+      },
+      "extensions": [
+        "charliermarsh.ruff",
+        "ms-python.python",
+        "ms-python.debugpy"
+      ]
+    }
+  }
+}

@@ -1,0 +1,17 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: equipment-detector
+  namespace: equipment-detector
+  labels:
+    app.kubernetes.io/name: equipment-degradation-detector
+spec:
+  to:
+    kind: Service
+    name: equipment-detector
+    weight: 100
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect

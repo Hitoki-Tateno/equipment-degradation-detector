@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: equipment-detector
+  namespace: equipment-detector
+  labels:
+    app.kubernetes.io/name: equipment-degradation-detector
+    app.kubernetes.io/component: app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: equipment-degradation-detector
+  strategy:
+    type: Recreate  # SQLiteは同時アクセス不可。RollingUpdateではなくRecreate
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: equipment-degradation-detector
+    spec:
+      containers:
+        - name: app
+          image: image-registry.openshift-image-registry.svc:5000/equipment-detector/equipment-degradation-detector:latest
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+            - name: api
+              containerPort: 8000
+              protocol: TCP
+          volumeMounts:
+            - name: data
+              mountPath: /app/data
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: equipment-detector-data
