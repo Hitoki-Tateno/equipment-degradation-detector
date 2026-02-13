@@ -16,12 +16,11 @@ from backend.interfaces.result_store import (
 
 
 @pytest.fixture
-def result_store():
-    """結果ストアの実装インスタンスを返す。
+def result_store(tmp_path):
+    """結果ストアの実装インスタンスを返す。"""
+    from backend.result_store.sqlite import SqliteResultStore
 
-    TODO: SQLite実装が完成したらここを差し替える。
-    """
-    pytest.skip("結果ストアの実装が未完成")
+    return SqliteResultStore(str(tmp_path / "test_result.db"))
 
 
 class TestTrendResults:

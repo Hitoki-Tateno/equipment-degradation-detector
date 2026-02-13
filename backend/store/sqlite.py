@@ -55,6 +55,8 @@ class SqliteDataStore(DataStoreInterface):
         return len(records)
 
     def ensure_category_path(self, path: list[str]) -> int:
+        if not path:
+            raise ValueError("path must not be empty")
         parent_id = None
         with self._conn:
             for name in path:
