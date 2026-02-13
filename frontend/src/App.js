@@ -1,6 +1,10 @@
 import React, { useState } from 'react';
 import { Layout, Typography, Empty } from 'antd';
 import { DashboardOutlined } from '@ant-design/icons';
+import CategoryTree from './components/CategoryTree';
+import WorkTimePlot from './components/WorkTimePlot';
+import mockCategories from './mocks/categories.json';
+import mockRecords from './mocks/records.json';
 import './App.css';
 
 const { Header, Sider, Content } = Layout;
@@ -9,6 +13,10 @@ const { Title, Text } = Typography;
 function App() {
   const [collapsed, setCollapsed] = useState(false);
   const [selectedCategoryId, setSelectedCategoryId] = useState(null);
+
+  const records = selectedCategoryId
+    ? mockRecords[String(selectedCategoryId)] || []
+    : [];
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
@@ -32,7 +40,10 @@ function App() {
           {!collapsed && (
             <div style={{ padding: '16px' }}>
               <Text type="secondary">分類選択</Text>
-              {/* CategoryTree: Issue #5 で実装 */}
+              <CategoryTree
+                categories={mockCategories.categories}
+                onSelect={setSelectedCategoryId}
+              />
             </div>
           )}
         </Sider>
@@ -42,7 +53,11 @@ function App() {
               {selectedCategoryId ? (
                 <>
                   <Title level={4}>作業時間プロット</Title>
-                  {/* WorkTimePlot: Issue #6 で実装 */}
+                  {records.length > 0 ? (
+                    <WorkTimePlot records={records} />
+                  ) : (
+                    <Empty description="この分類にはレコードがありません" />
+                  )}
                 </>
               ) : (
                 <Empty description="左のツリーから分類を選択してください" />
