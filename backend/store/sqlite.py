@@ -35,7 +35,9 @@ class SqliteDataStore(DataStoreInterface):
 
     def __init__(self, db_path: str):
         self._conn = sqlite3.connect(
-            db_path, detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES
+            db_path,
+            detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES,
+            check_same_thread=False,
         )
         self._conn.execute("PRAGMA foreign_keys = ON")
         self._conn.executescript(SCHEMA_SQL)
