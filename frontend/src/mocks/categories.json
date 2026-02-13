@@ -1,0 +1,42 @@
+{
+  "categories": [
+    {
+      "id": 1,
+      "name": "ポンプ",
+      "parent_id": null,
+      "children": [
+        {
+          "id": 2,
+          "name": "冷却水ポンプ",
+          "parent_id": 1,
+          "children": []
+        },
+        {
+          "id": 3,
+          "name": "給水ポンプ",
+          "parent_id": 1,
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "name": "バルブ",
+      "parent_id": null,
+      "children": [
+        {
+          "id": 5,
+          "name": "安全弁",
+          "parent_id": 4,
+          "children": []
+        },
+        {
+          "id": 6,
+          "name": "制御弁",
+          "parent_id": 4,
+          "children": []
+        }
+      ]
+    }
+  ]
+}
