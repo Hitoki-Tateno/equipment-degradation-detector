@@ -3,10 +3,12 @@
 取り込みAPI + データ提供API + 分析結果APIを統合。
 """
 
+import io
 from datetime import datetime
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, HTTPException
+import pandas as pd
+from fastapi import Depends, FastAPI, HTTPException, UploadFile
 from pydantic import BaseModel
 
 from backend.dependencies import get_data_store, get_result_store
@@ -130,6 +132,43 @@ async def post_records(
         )
     inserted = store.upsert_records(work_records)
     return {"inserted": inserted}
+
+
+@app.post("/api/records/csv")
+async def post_records_csv(
+    file: UploadFile,
+    store: StoreDep,
+):
+    """CSVファイルから作業記録をバッチ投入する（デバッグ用）。"""
+    content = await file.read()
+    df = pd.read_csv(io.BytesIO(content))
+
+    if "work_time" not in df.columns or "recorded_at" not in df.columns:
+        raise HTTPException(
+            status_code=400, detail="work_time and recorded_at columns are required"
+        )
+
+    df["recorded_at"] = pd.to_datetime(df["recorded_at"])
+    category_columns = [c for c in df.columns if c not in ("work_time", "recorded_at")]
+
+    work_records: list[WorkRecord] = []
+    skipped = 0
+    for _, row in df.iterrows():
+        path = [str(row[c]) for c in category_columns if pd.notna(row[c]) and str(row[c]).strip()]
+        if not path:
+            skipped += 1
+            continue
+        category_id = store.ensure_category_path(path)
+        work_records.append(
+            WorkRecord(
+                category_id=category_id,
+                work_time=float(row["work_time"]),
+                recorded_at=row["recorded_at"].to_pydatetime(),
+            )
+        )
+
+    inserted = store.upsert_records(work_records)
+    return {"inserted": inserted, "skipped": skipped}
 
 
 @app.get("/api/records")
