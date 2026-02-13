@@ -1,10 +1,9 @@
-import React, { useState } from 'react';
-import { Layout, Typography, Empty } from 'antd';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Layout, Typography, Empty, Spin, Alert } from 'antd';
 import { DashboardOutlined } from '@ant-design/icons';
 import CategoryTree from './components/CategoryTree';
 import WorkTimePlot from './components/WorkTimePlot';
-import mockCategories from './mocks/categories.json';
-import mockRecords from './mocks/records.json';
+import { fetchCategories, fetchRecords } from './services/api';
 import './App.css';
 
 const { Header, Sider, Content } = Layout;
@@ -14,9 +13,44 @@ function App() {
   const [collapsed, setCollapsed] = useState(false);
   const [selectedCategoryId, setSelectedCategoryId] = useState(null);
 
-  const records = selectedCategoryId
-    ? mockRecords[String(selectedCategoryId)] || []
-    : [];
+  const [categories, setCategories] = useState([]);
+  const [records, setRecords] = useState([]);
+
+  const [loadingCategories, setLoadingCategories] = useState(true);
+  const [loadingRecords, setLoadingRecords] = useState(false);
+  const [error, setError] = useState(null);
+
+  // 初回マウント時にカテゴリツリーを取得
+  useEffect(() => {
+    let cancelled = false;
+    setLoadingCategories(true);
+    fetchCategories()
+      .then((cats) => {
+        if (!cancelled) setCategories(cats);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(`カテゴリ取得エラー: ${err.message}`);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingCategories(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  // カテゴリ選択時にレコードを取得
+  const loadRecords = useCallback((categoryId) => {
+    setSelectedCategoryId(categoryId);
+    if (categoryId == null) {
+      setRecords([]);
+      return;
+    }
+    setLoadingRecords(true);
+    setError(null);
+    fetchRecords(categoryId)
+      .then((recs) => setRecords(recs))
+      .catch((err) => setError(`レコード取得エラー: ${err.message}`))
+      .finally(() => setLoadingRecords(false));
+  }, []);
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
@@ -40,20 +74,36 @@ function App() {
           {!collapsed && (
             <div style={{ padding: '16px' }}>
               <Text type="secondary">分類選択</Text>
-              <CategoryTree
-                categories={mockCategories.categories}
-                onSelect={setSelectedCategoryId}
-              />
+              {loadingCategories ? (
+                <Spin style={{ display: 'block', marginTop: 24 }} />
+              ) : (
+                <CategoryTree
+                  categories={categories}
+                  onSelect={loadRecords}
+                />
+              )}
             </div>
           )}
         </Sider>
         <Layout style={{ padding: '24px' }}>
           <Content className="site-content">
+            {error && (
+              <Alert
+                message={error}
+                type="error"
+                showIcon
+                closable
+                onClose={() => setError(null)}
+                style={{ marginBottom: 16 }}
+              />
+            )}
             <div className="plot-container">
               {selectedCategoryId ? (
                 <>
                   <Title level={4}>作業時間プロット</Title>
-                  {records.length > 0 ? (
+                  {loadingRecords ? (
+                    <Spin style={{ display: 'block', marginTop: 24 }} />
+                  ) : records.length > 0 ? (
                     <WorkTimePlot records={records} />
                   ) : (
                     <Empty description="この分類にはレコードがありません" />
