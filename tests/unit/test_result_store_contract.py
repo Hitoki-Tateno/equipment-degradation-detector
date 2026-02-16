@@ -71,12 +71,8 @@ class TestAnomalyResults:
 
     def test_delete_anomaly_results(self, result_store: ResultStoreInterface):
         results = [
-            AnomalyResult(
-                category_id=1, recorded_at=datetime(2025, 1, 1), anomaly_score=-0.3
-            ),
-            AnomalyResult(
-                category_id=1, recorded_at=datetime(2025, 1, 2), anomaly_score=-0.8
-            ),
+            AnomalyResult(category_id=1, recorded_at=datetime(2025, 1, 1), anomaly_score=-0.3),
+            AnomalyResult(category_id=1, recorded_at=datetime(2025, 1, 2), anomaly_score=-0.8),
         ]
         result_store.save_anomaly_results(results)
         result_store.delete_anomaly_results(1)
