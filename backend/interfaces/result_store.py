@@ -81,3 +81,13 @@ class ResultStoreInterface(ABC):
     def get_model_definition(self, category_id: int) -> ModelDefinition | None:
         """モデル定義を取得する。"""
         ...
+
+    @abstractmethod
+    def delete_model_definition(self, category_id: int) -> None:
+        """指定カテゴリのモデル定義を削除する。存在しない場合もエラーにしない。"""
+        ...
+
+    @abstractmethod
+    def delete_anomaly_results(self, category_id: int) -> None:
+        """指定カテゴリの全異常スコア結果を削除する。存在しない場合もエラーにしない。"""
+        ...

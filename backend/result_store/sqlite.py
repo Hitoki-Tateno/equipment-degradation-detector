@@ -143,3 +143,17 @@ class SqliteResultStore(ResultStoreInterface):
             sensitivity=row[3],
             excluded_points=excluded,
         )
+
+    def delete_model_definition(self, category_id: int) -> None:
+        with self._conn:
+            self._conn.execute(
+                "DELETE FROM model_definitions WHERE category_id = ?",
+                (category_id,),
+            )
+
+    def delete_anomaly_results(self, category_id: int) -> None:
+        with self._conn:
+            self._conn.execute(
+                "DELETE FROM anomaly_results WHERE category_id = ?",
+                (category_id,),
+            )

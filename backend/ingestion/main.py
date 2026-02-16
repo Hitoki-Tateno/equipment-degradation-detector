@@ -273,6 +273,20 @@ async def put_model_definition(
     return {"retrained": retrained}
 
 
+@app.delete("/api/models/{category_id}")
+async def delete_model_definition_endpoint(
+    category_id: int,
+    result_store: ResultStoreDep,
+):
+    """モデル定義を削除する。異常検知結果もカスケード削除。未定義なら404。"""
+    existing = result_store.get_model_definition(category_id)
+    if existing is None:
+        raise HTTPException(status_code=404, detail="Model definition not found")
+    result_store.delete_anomaly_results(category_id)
+    result_store.delete_model_definition(category_id)
+    return {"deleted": True}
+
+
 @app.post("/api/analysis/run")
 async def run_analysis():
     """分析を手動トリガーする（スケルトン）。"""
