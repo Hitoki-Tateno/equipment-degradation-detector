@@ -3,7 +3,15 @@ import { Layout, Typography, Empty, Spin, Alert } from 'antd';
 import { DashboardOutlined } from '@ant-design/icons';
 import CategoryTree from './components/CategoryTree';
 import WorkTimePlot from './components/WorkTimePlot';
-import { fetchCategories, fetchRecords } from './services/api';
+import ModelControls from './components/ModelControls';
+import {
+  fetchCategories,
+  fetchRecords,
+  fetchResults,
+  fetchModelDefinition,
+  saveModelDefinition,
+  deleteModelDefinition,
+} from './services/api';
 import './App.css';
 
 const { Header, Sider, Content } = Layout;
@@ -15,6 +23,15 @@ function App() {
 
   const [categories, setCategories] = useState([]);
   const [records, setRecords] = useState([]);
+
+  const [trend, setTrend] = useState(null);
+  const [anomalies, setAnomalies] = useState([]);
+
+  const [modelStatus, setModelStatus] = useState('undefined');
+  const [baselineRange, setBaselineRange] = useState(null);
+  const [excludedIndices, setExcludedIndices] = useState([]);
+  const [sensitivity, setSensitivity] = useState(0.5);
+  const [savingModel, setSavingModel] = useState(false);
 
   const [loadingCategories, setLoadingCategories] = useState(true);
   const [loadingRecords, setLoadingRecords] = useState(false);
@@ -37,19 +54,100 @@ function App() {
     return () => { cancelled = true; };
   }, []);
 
-  // カテゴリ選択時にレコードを取得
-  const loadRecords = useCallback((categoryId) => {
+  // カテゴリ選択時にデータを取得
+  const loadCategoryData = useCallback(async (categoryId) => {
     setSelectedCategoryId(categoryId);
     if (categoryId == null) {
       setRecords([]);
+      setTrend(null);
+      setAnomalies([]);
+      setModelStatus('undefined');
+      setBaselineRange(null);
+      setExcludedIndices([]);
+      setSensitivity(0.5);
       return;
     }
     setLoadingRecords(true);
     setError(null);
-    fetchRecords(categoryId)
-      .then((recs) => setRecords(recs))
-      .catch((err) => setError(`レコード取得エラー: ${err.message}`))
-      .finally(() => setLoadingRecords(false));
+    try {
+      const [recs, results] = await Promise.all([
+        fetchRecords(categoryId),
+        fetchResults(categoryId),
+      ]);
+      setRecords(recs);
+      setTrend(results.trend);
+      setAnomalies(results.anomalies || []);
+
+      try {
+        const modelDef = await fetchModelDefinition(categoryId);
+        setModelStatus('defined');
+        setBaselineRange({ start: modelDef.baseline_start, end: modelDef.baseline_end });
+        setSensitivity(modelDef.sensitivity);
+        const excludedDates = new Set(modelDef.excluded_points.map((d) => d));
+        const indices = recs
+          .map((r, i) => (excludedDates.has(r.recorded_at) ? i : -1))
+          .filter((i) => i >= 0);
+        setExcludedIndices(indices);
+      } catch (err) {
+        if (err.response && err.response.status === 404) {
+          setModelStatus('undefined');
+          setBaselineRange(null);
+          setExcludedIndices([]);
+          setSensitivity(0.5);
+        } else {
+          throw err;
+        }
+      }
+    } catch (err) {
+      setError(`データ取得エラー: ${err.message}`);
+    } finally {
+      setLoadingRecords(false);
+    }
+  }, []);
+
+  const handleSaveModel = useCallback(async () => {
+    if (!selectedCategoryId || !baselineRange) return;
+    setSavingModel(true);
+    try {
+      const excludedPoints = excludedIndices.map((i) => records[i].recorded_at);
+      await saveModelDefinition(selectedCategoryId, {
+        baseline_start: baselineRange.start,
+        baseline_end: baselineRange.end,
+        sensitivity,
+        excluded_points: excludedPoints,
+      });
+      setModelStatus('defined');
+      const results = await fetchResults(selectedCategoryId);
+      setTrend(results.trend);
+      setAnomalies(results.anomalies || []);
+    } catch (err) {
+      setError(`モデル保存エラー: ${err.message}`);
+    } finally {
+      setSavingModel(false);
+    }
+  }, [selectedCategoryId, baselineRange, excludedIndices, sensitivity, records]);
+
+  const handleDeleteModel = useCallback(async () => {
+    if (!selectedCategoryId) return;
+    try {
+      await deleteModelDefinition(selectedCategoryId);
+      setModelStatus('undefined');
+      setBaselineRange(null);
+      setExcludedIndices([]);
+      setSensitivity(0.5);
+      setAnomalies([]);
+      const results = await fetchResults(selectedCategoryId);
+      setTrend(results.trend);
+      setAnomalies(results.anomalies || []);
+    } catch (err) {
+      setError(`モデル削除エラー: ${err.message}`);
+    }
+  }, [selectedCategoryId]);
+
+  const toggleExclude = useCallback((idx) => {
+    setExcludedIndices((prev) =>
+      prev.includes(idx) ? prev.filter((i) => i !== idx) : [...prev, idx],
+    );
   }, []);
 
   return (
@@ -79,7 +177,7 @@ function App() {
               ) : (
                 <CategoryTree
                   categories={categories}
-                  onSelect={loadRecords}
+                  onSelect={loadCategoryData}
                 />
               )}
             </div>
@@ -104,7 +202,29 @@ function App() {
                   {loadingRecords ? (
                     <Spin style={{ display: 'block', marginTop: 24 }} />
                   ) : records.length > 0 ? (
-                    <WorkTimePlot records={records} />
+                    <>
+                      <WorkTimePlot
+                        records={records}
+                        trend={trend}
+                        anomalies={anomalies}
+                        sensitivity={sensitivity}
+                        baselineRange={baselineRange}
+                        excludedIndices={excludedIndices}
+                        modelStatus={modelStatus}
+                        onBaselineSelect={setBaselineRange}
+                        onToggleExclude={toggleExclude}
+                      />
+                      <ModelControls
+                        modelStatus={modelStatus}
+                        baselineRange={baselineRange}
+                        sensitivity={sensitivity}
+                        onSensitivityChange={setSensitivity}
+                        onSave={handleSaveModel}
+                        onDelete={handleDeleteModel}
+                        savingModel={savingModel}
+                        hasAnomalies={anomalies.length > 0}
+                      />
+                    </>
                   ) : (
                     <Empty description="この分類にはレコードがありません" />
                   )}

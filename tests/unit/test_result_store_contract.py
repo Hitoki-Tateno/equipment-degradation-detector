@@ -69,6 +69,22 @@ class TestAnomalyResults:
     def test_returns_empty_for_missing(self, result_store: ResultStoreInterface):
         assert result_store.get_anomaly_results(999) == []
 
+    def test_delete_anomaly_results(self, result_store: ResultStoreInterface):
+        results = [
+            AnomalyResult(
+                category_id=1, recorded_at=datetime(2025, 1, 1), anomaly_score=-0.3
+            ),
+            AnomalyResult(
+                category_id=1, recorded_at=datetime(2025, 1, 2), anomaly_score=-0.8
+            ),
+        ]
+        result_store.save_anomaly_results(results)
+        result_store.delete_anomaly_results(1)
+        assert result_store.get_anomaly_results(1) == []
+
+    def test_delete_anomaly_results_idempotent(self, result_store: ResultStoreInterface):
+        result_store.delete_anomaly_results(999)
+
 
 class TestModelDefinitions:
     """モデル定義の契約テスト。"""
@@ -90,3 +106,18 @@ class TestModelDefinitions:
 
     def test_returns_none_for_missing(self, result_store: ResultStoreInterface):
         assert result_store.get_model_definition(999) is None
+
+    def test_delete_model_definition(self, result_store: ResultStoreInterface):
+        defn = ModelDefinition(
+            category_id=1,
+            baseline_start=datetime(2025, 1, 1),
+            baseline_end=datetime(2025, 6, 1),
+            sensitivity=0.5,
+            excluded_points=[],
+        )
+        result_store.save_model_definition(defn)
+        result_store.delete_model_definition(1)
+        assert result_store.get_model_definition(1) is None
+
+    def test_delete_model_definition_idempotent(self, result_store: ResultStoreInterface):
+        result_store.delete_model_definition(999)
