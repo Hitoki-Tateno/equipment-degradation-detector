@@ -18,6 +18,33 @@ const client = axios.create({ baseURL: '/api' });
  */
 
 /**
+ * @typedef {Object} TrendResult
+ * @property {number} slope
+ * @property {number} intercept
+ * @property {boolean} is_warning
+ */
+
+/**
+ * @typedef {Object} AnomalyResult
+ * @property {string} recorded_at
+ * @property {number} anomaly_score
+ */
+
+/**
+ * @typedef {Object} AnalysisResult
+ * @property {TrendResult|null} trend
+ * @property {AnomalyResult[]} anomalies
+ */
+
+/**
+ * @typedef {Object} ModelDefinition
+ * @property {string} baseline_start
+ * @property {string} baseline_end
+ * @property {number} sensitivity
+ * @property {string[]} excluded_points
+ */
+
+/**
  * GET /api/categories
  * @param {number} [rootId] - ルートカテゴリID（省略時は全ツリー）
  * @returns {Promise<CategoryNode[]>}
@@ -42,4 +69,58 @@ export async function fetchRecords(categoryId, start, end) {
   if (end) params.end = end;
   const { data } = await client.get('/records', { params });
   return data.records;
+}
+
+/**
+ * GET /api/results/{category_id}
+ * @param {number} categoryId
+ * @returns {Promise<AnalysisResult>}
+ */
+export async function fetchResults(categoryId) {
+  const { data } = await client.get(`/results/${categoryId}`);
+  return data;
+}
+
+/**
+ * GET /api/models/{category_id}
+ * @param {number} categoryId
+ * @returns {Promise<ModelDefinition>}
+ */
+export async function fetchModelDefinition(categoryId) {
+  const { data } = await client.get(`/models/${categoryId}`);
+  return data;
+}
+
+/**
+ * PUT /api/models/{category_id}
+ * @param {number} categoryId
+ * @param {Object} definition
+ * @param {string} definition.baseline_start
+ * @param {string} definition.baseline_end
+ * @param {number} definition.sensitivity
+ * @param {string[]} [definition.excluded_points]
+ * @returns {Promise<{retrained: boolean}>}
+ */
+export async function saveModelDefinition(categoryId, definition) {
+  const { data } = await client.put(`/models/${categoryId}`, definition);
+  return data;
+}
+
+/**
+ * DELETE /api/models/{category_id}
+ * @param {number} categoryId
+ * @returns {Promise<{deleted: boolean}>}
+ */
+export async function deleteModelDefinition(categoryId) {
+  const { data } = await client.delete(`/models/${categoryId}`);
+  return data;
+}
+
+/**
+ * POST /api/analysis/run
+ * @returns {Promise<{processed_categories: number}>}
+ */
+export async function triggerAnalysis() {
+  const { data } = await client.post('/analysis/run');
+  return data;
 }
