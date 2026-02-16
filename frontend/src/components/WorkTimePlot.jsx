@@ -2,7 +2,7 @@ import React from 'react';
 import Plot from 'react-plotly.js';
 
 function WorkTimePlot({ records }) {
-  const x = records.map((_, i) => i + 1);
+  const x = records.map((r) => r.recorded_at);
   const y = records.map((r) => r.work_time);
 
   return (
@@ -18,8 +18,8 @@ function WorkTimePlot({ records }) {
         },
       ]}
       layout={{
-        xaxis: { title: '回数 n' },
-        yaxis: { title: '作業時間 t (分)' },
+        xaxis: { title: '記録日時', type: 'date' },
+        yaxis: { title: '作業時間 t (秒)' },
         margin: { t: 20, r: 20 },
         autosize: true,
       }}
