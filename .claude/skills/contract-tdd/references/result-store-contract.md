@@ -44,6 +44,18 @@ class ModelDefinition:
 - excluded_pointsはJSON配列としてTEXTカラムに保存
 - 存在しないcategory_idに対してはNoneを返す
 
+### delete_model_definition
+
+- 指定category_idのモデル定義を削除する
+- 存在しないcategory_idに対してはエラーを発生させない（冪等）
+- カスケード: 呼び出し元で delete_anomaly_results も合わせて呼ぶこと
+
+### delete_anomaly_results
+
+- 指定category_idの全異常スコア結果を削除する
+- 存在しないcategory_idに対してはエラーを発生させない（冪等）
+- 削除後、get_anomaly_results は空リストを返す
+
 ## 重要: anomaly_scoreについて
 
 scikit-learnのIsolation Forestの`score_samples()`が返す生スコアを保存する。このスコアはcontamination（感度）に依存しない。閾値判定はフロントエンド側で実行するため、結果ストアにはスコア値のみを保持する。

@@ -57,6 +57,9 @@ import * as Icons from "@ant-design/icons";
 - Plotly Box Selectでベースライン期間選択
 - Plotly clickイベントで除外点トグル
 - `Slider` で感度調整 → リアルタイム閾値変更
+- モデル保存ボタン（PUT /api/models）
+- モデル削除ボタン + `Modal.confirm` 確認ダイアログ（DELETE /api/models → カスケード削除）
+- モデルのライフサイクル: 「未定義」⇔「定義済み」の2状態のみ。「更新」は削除→再作成で対応
 
 ### Step 3: 監視ダッシュボード
 - `Table` でカテゴリ別のステータス一覧

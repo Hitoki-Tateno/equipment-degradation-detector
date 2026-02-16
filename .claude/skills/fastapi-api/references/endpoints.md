@@ -13,6 +13,20 @@
   - category_path から ensure_category_path でcategory_idを取得（未知なら自動作成）
   - category_id × recorded_at が既存と一致 → 上書き
   - それ以外 → 新規追加
+  - 処理末尾で AnalysisEngine.run(category_id) を同期実行（トレンド分析 + モデル定義済みなら異常検知）
+```
+
+## POST /api/records/csv（CSV取り込みAPI）
+
+```
+リクエスト: multipart/form-data (CSVファイル)
+
+レスポンス:
+  { "inserted": 10, "skipped": 0 }
+
+振る舞い:
+  - CSVの各行を解析し、category_pathを自動構築
+  - 処理末尾で影響を受ける全カテゴリに対して AnalysisEngine.run(category_id) を同期実行
 ```
 
 ## GET /api/records（データ提供API — 境界②）
@@ -62,27 +76,41 @@
 備考: 未定義の場合は 404
 ```
 
-## PUT /api/models/{category_id}（モデル定義更新）
+## PUT /api/models/{category_id}（モデル定義作成）
 
 ```
 リクエスト:
   { "baseline_start": "...", "baseline_end": "...", "sensitivity": 0.5, "excluded_points": ["2025-03-15T00:00:00"] }
 
 レスポンス:
-  { "retrained": true }
+  { "created": true }
 
 振る舞い:
-  1. 既存のモデル定義を取得
-  2. baseline_start, baseline_end, excluded_points のいずれかが変更されたか比較
-  3. 変更あり → Isolation Forestを再学習し結果ストアを更新。retrained: true
-  4. sensitivityのみ変更 → 再学習しない。retrained: false
+  - モデル定義を保存（既存があれば上書き）
+  - IsolationForestの学習を実行し、anomaly_scoresを結果ストアに保存
+  - 「更新」の概念はない。変更時はDELETE→PUTで再作成する
 ```
 
-## POST /api/analysis/run（手動トリガー — 開発用）
+## DELETE /api/models/{category_id}（モデル定義削除）
+
+```
+レスポンス:
+  { "deleted": true }
+
+振る舞い:
+  - モデル定義を削除
+  - 該当カテゴリの異常検知結果（anomaly_results）もカスケード削除
+  - 未定義の場合は 404
+```
+
+## POST /api/analysis/run（手動トリガー）
 
 ```
 レスポンス:
   { "processed_categories": 5 }
 
-振る舞い: 全分類に対して分析層の判定フローを実行
+振る舞い:
+  - 全末端カテゴリに対してトレンド分析を実行
+  - モデル定義済みのカテゴリには異常検知も実行
+  - ダッシュボードの「分析実行」ボタンから呼び出す
 ```

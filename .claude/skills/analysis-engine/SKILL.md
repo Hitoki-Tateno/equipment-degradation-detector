@@ -1,6 +1,6 @@
 ---
 name: analysis-engine
-description: 分析層（Isolation Forest + 線形回帰）の実装。異常検知モデル、トレンド分析、特徴量構築の戦略パターン、スコア算出、スケジューラーの実装時に使用する。「Isolation Forest」「回帰分析」「トレンド」「異常検知」「分析層」「スケジューラー」「特徴量」に関するタスクで発動する。
+description: 分析層（Isolation Forest + 線形回帰）の実装。異常検知モデル、トレンド分析、特徴量構築の戦略パターン、スコア算出の実装時に使用する。「Isolation Forest」「回帰分析」「トレンド」「異常検知」「分析層」「特徴量」に関するタスクで発動する。
 ---
 
 # 分析層実装
@@ -13,6 +13,15 @@ description: 分析層（Isolation Forest + 線形回帰）の実装。異常検
 |---|---|---|---|
 | 緩やかな経年劣化 | 線形回帰 | 全期間 | システム固定 |
 | 突発的な異常値 | Isolation Forest | ベースライン期間 | ユーザー定義 |
+
+## 分析実行タイミング
+
+分析はデータ取り込みエンドポイント（POST /api/records, POST /api/records/csv）の処理末尾で**同期的に**実行する。スケジューラーや定期実行は使用しない。
+
+- トレンド分析: レコードが存在すれば常時実行
+- 異常検知: モデルが定義済みの場合のみ実行（未定義ならスキップ）
+
+POST /api/analysis/run は手動トリガー（ダッシュボードの「分析実行」ボタン用）として残す。
 
 ## 依存方向
 
@@ -52,9 +61,11 @@ class RawWorkTimeStrategy(FeatureStrategy):
 
 [references/isolation-forest.md](references/isolation-forest.md) に詳細を記載。
 
-## 判定フロー（Step 3: 継続監視）
+**注意**: IsolationForestの実装は特徴量の選定が完了してから着手する。特徴量未定のまま実装すると手戻りが発生するため。
 
-[references/analysis-flow.md](references/analysis-flow.md) に判定フロー全体を記載。
+## 分析実行フロー
+
+[references/analysis-flow.md](references/analysis-flow.md) に分析フロー全体を記載。
 
 ## TDD
 

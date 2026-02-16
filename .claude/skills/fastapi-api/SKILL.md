@@ -51,8 +51,26 @@ class RecordsBatchRequest(BaseModel):
 
 [references/endpoints.md](references/endpoints.md) に全エンドポイントの詳細仕様を記載。
 
+## 取り込み時同期分析
+
+POST /api/records および POST /api/records/csv の処理末尾で、対象カテゴリの分析を**同期的に**実行する:
+
+```python
+# POST /api/records の末尾
+engine = get_analysis_engine()
+for category_id in affected_category_ids:
+    engine.run(category_id)
+```
+
+## モデルのライフサイクル
+
+モデルは「未定義」と「定義済み」の2状態のみ。「更新」は存在しない（削除→再作成で対応）。
+
+- **PUT /api/models/{category_id}**: モデルを新規作成（既存があれば上書き）。IsolationForestの学習を実行
+- **DELETE /api/models/{category_id}**: モデルを削除。異常検知結果もカスケード削除
+- **GET /api/models/{category_id}**: モデル定義を取得。未定義なら404
+
 ## 注意事項
 
 - `category_path` で指定された分類がツリーに存在しなければ `ensure_category_path` で自動作成
-- PUT `/api/models/{category_id}` ではベースライン/除外点の変更有無を比較し、変更があった場合のみ再学習をトリガー。sensitivityのみの変更では再学習しない
 - ヘルスチェック `GET /api/health` は実装済み
