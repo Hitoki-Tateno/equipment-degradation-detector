@@ -91,3 +91,8 @@ class ResultStoreInterface(ABC):
     def delete_anomaly_results(self, category_id: int) -> None:
         """指定カテゴリの全異常スコア結果を削除する。存在しない場合もエラーにしない。"""
         ...
+
+    @abstractmethod
+    def delete_all_data(self) -> None:
+        """全データを削除する（デバッグ用）。"""
+        ...

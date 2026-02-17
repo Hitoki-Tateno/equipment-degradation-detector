@@ -131,3 +131,8 @@ class SqliteDataStore(DataStoreInterface):
         if root_id is not None:
             return [build_node(root_id)] if root_id in node_data else []
         return [build_node(nid) for nid in children_map.get(None, [])]
+
+    def delete_all_data(self) -> None:
+        with self._conn:
+            self._conn.execute("DELETE FROM work_records")
+            self._conn.execute("DELETE FROM categories")
