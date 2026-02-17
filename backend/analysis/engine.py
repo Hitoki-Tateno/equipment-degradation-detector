@@ -53,11 +53,17 @@ class AnalysisEngine:
         if model_def is not None:
             pass  # TODO: #7 Isolation Forest
 
-    def run_all(self) -> None:
-        """全末端カテゴリに対してトレンド分析を実行する."""
+    def run_all(self) -> int:
+        """全末端カテゴリに対してトレンド分析を実行する.
+
+        Returns:
+            処理した末端カテゴリ数。
+        """
         tree = self._data_store.get_category_tree()
-        for leaf in self._collect_leaves(tree):
+        leaves = self._collect_leaves(tree)
+        for leaf in leaves:
             self.run(leaf.id)
+        return len(leaves)
 
     @staticmethod
     def _collect_leaves(nodes: list[CategoryNode]) -> list[CategoryNode]:
