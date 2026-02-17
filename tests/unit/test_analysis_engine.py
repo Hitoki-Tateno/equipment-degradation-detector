@@ -1,9 +1,11 @@
 """分析エンジンのユニットテスト（FeatureBuilder + トレンド分析）."""
 
 import numpy as np
+import pytest
 
 from backend.analysis.feature import RawWorkTimeFeatureBuilder
 from backend.analysis.trend import WARNING_THRESHOLD, compute_trend
+from backend.interfaces.feature import FeatureBuilder
 
 
 class TestRawWorkTimeFeatureBuilder:
@@ -21,6 +23,22 @@ class TestRawWorkTimeFeatureBuilder:
         builder = RawWorkTimeFeatureBuilder()
         result = builder.build([])
         assert result.shape == (0, 1)
+
+    def test_build_accepts_tuple(self):
+        """tuple 入力も受け付けること."""
+        builder = RawWorkTimeFeatureBuilder()
+        result = builder.build((5.0, 10.0))
+        assert result.shape == (2, 1)
+
+    def test_build_rejects_non_2d(self):
+        """_build_impl が1次元を返した場合 ValueError."""
+
+        class BadBuilder(FeatureBuilder):
+            def _build_impl(self, work_times):
+                return np.array(list(work_times))
+
+        with pytest.raises(ValueError, match="2D array"):
+            BadBuilder().build([1.0, 2.0])
 
 
 class TestComputeTrend:
