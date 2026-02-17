@@ -7,7 +7,7 @@
 ## 依存ルール（絶対）
 
 ```
-backend/interfaces/   ← 全ての層はここにのみ依存する
+backend/interfaces/   ← 全ての層はここにのみ依存する（DataStore, ResultStore, FeatureBuilder）
 backend/store/        ← analysis/ や ingestion/ から直接import禁止
 backend/result_store/ ← analysis/ や ingestion/ から直接import禁止
 ```
@@ -31,7 +31,7 @@ backend/result_store/ ← analysis/ や ingestion/ から直接import禁止
 
 ```
 backend/
-  interfaces/       # 抽象クラス（ABC）— 全層の契約
+  interfaces/       # 抽象クラス（ABC）— 全層の契約（DataStore, ResultStore, FeatureBuilder）
   ingestion/        # FastAPI（取り込みAPI + データ提供API）
   store/            # Store層（SQLite実装）
   analysis/         # 分析層（scikit-learn）

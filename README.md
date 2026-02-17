@@ -76,7 +76,7 @@ oc start-build equipment-detector-build -n equipment-detector
 ```
 .devcontainer/        # Dev Container設定（Docker, プロキシ対応）
 backend/
-  interfaces/         # 抽象クラス（ABC）— 全層の契約
+  interfaces/         # 抽象クラス（ABC）— 全層の契約（DataStore, ResultStore, FeatureBuilder）
   ingestion/          # 取り込みAPI + データ提供API（FastAPI）
   store/              # Store層の実装（SQLite）
   analysis/           # 分析層（scikit-learn）
