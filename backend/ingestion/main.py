@@ -11,12 +11,14 @@ import pandas as pd
 from fastapi import Depends, FastAPI, HTTPException, UploadFile
 from pydantic import BaseModel
 
-from backend.dependencies import get_data_store, get_result_store
+from backend.analysis.engine import AnalysisEngine
+from backend.dependencies import get_analysis_engine, get_data_store, get_result_store
 from backend.interfaces.data_store import CategoryNode, DataStoreInterface, WorkRecord
 from backend.interfaces.result_store import ModelDefinition, ResultStoreInterface
 
 StoreDep = Annotated[DataStoreInterface, Depends(get_data_store)]
 ResultStoreDep = Annotated[ResultStoreInterface, Depends(get_result_store)]
+EngineDep = Annotated[AnalysisEngine, Depends(get_analysis_engine)]
 
 app = FastAPI(
     title="設備劣化検知システム API",
@@ -118,11 +120,14 @@ async def health_check():
 async def post_records(
     body: RecordsBatchRequest,
     store: StoreDep,
+    engine: EngineDep,
 ):
     """作業記録をバッチ投入する。"""
     work_records: list[WorkRecord] = []
+    affected_category_ids: set[int] = set()
     for item in body.records:
         category_id = store.ensure_category_path(item.category_path)
+        affected_category_ids.add(category_id)
         work_records.append(
             WorkRecord(
                 category_id=category_id,
@@ -131,6 +136,10 @@ async def post_records(
             )
         )
     inserted = store.upsert_records(work_records)
+
+    for cid in affected_category_ids:
+        engine.run(cid)
+
     return {"inserted": inserted}
 
 
@@ -138,6 +147,7 @@ async def post_records(
 async def post_records_csv(
     file: UploadFile,
     store: StoreDep,
+    engine: EngineDep,
 ):
     """CSVファイルから作業記録をバッチ投入する（デバッグ用）。"""
     content = await file.read()
@@ -152,6 +162,7 @@ async def post_records_csv(
     category_columns = [c for c in df.columns if c not in ("work_time", "recorded_at")]
 
     work_records: list[WorkRecord] = []
+    affected_category_ids: set[int] = set()
     skipped = 0
     for _, row in df.iterrows():
         path = [str(row[c]) for c in category_columns if pd.notna(row[c]) and str(row[c]).strip()]
@@ -159,6 +170,7 @@ async def post_records_csv(
             skipped += 1
             continue
         category_id = store.ensure_category_path(path)
+        affected_category_ids.add(category_id)
         work_records.append(
             WorkRecord(
                 category_id=category_id,
@@ -168,6 +180,10 @@ async def post_records_csv(
         )
 
     inserted = store.upsert_records(work_records)
+
+    for cid in affected_category_ids:
+        engine.run(cid)
+
     return {"inserted": inserted, "skipped": skipped}
 
 
@@ -288,6 +304,7 @@ async def delete_model_definition_endpoint(
 
 
 @app.post("/api/analysis/run")
-async def run_analysis():
-    """分析を手動トリガーする（スケルトン）。"""
-    return {"status": "not_implemented"}
+async def run_analysis(engine: EngineDep):
+    """全末端カテゴリに対して分析を手動トリガーする。"""
+    count = engine.run_all()
+    return {"processed_categories": count}

@@ -235,8 +235,9 @@ class TestAnalysisEngineRunAll:
         ]
         mock_result_store.get_model_definition.return_value = None
 
-        engine.run_all()
+        result = engine.run_all()
 
+        assert result == 2
         assert mock_data_store.get_records.call_count == 2
         mock_data_store.get_records.assert_any_call(2)
         mock_data_store.get_records.assert_any_call(3)
@@ -245,8 +246,9 @@ class TestAnalysisEngineRunAll:
         """空ツリー → 何もしない."""
         mock_data_store.get_category_tree.return_value = []
 
-        engine.run_all()
+        result = engine.run_all()
 
+        assert result == 0
         mock_data_store.get_records.assert_not_called()
 
     def test_skips_non_leaf(self, engine, mock_data_store, mock_result_store):
@@ -264,6 +266,7 @@ class TestAnalysisEngineRunAll:
         mock_data_store.get_category_tree.return_value = tree
         mock_data_store.get_records.return_value = []
 
-        engine.run_all()
+        result = engine.run_all()
 
+        assert result == 1
         mock_data_store.get_records.assert_called_once_with(2)
