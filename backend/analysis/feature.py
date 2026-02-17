@@ -1,21 +1,12 @@
-"""特徴量構築の戦略パターン."""
-
-from abc import ABC, abstractmethod
-from datetime import datetime
+"""FeatureBuilder の実装."""
 
 import numpy as np
 
-
-class FeatureStrategy(ABC):
-    """特徴量抽出の抽象基底クラス."""
-
-    @abstractmethod
-    def extract(self, work_times: list[float], timestamps: list[datetime]) -> np.ndarray:
-        """作業時間とタイムスタンプから特徴量ベクトルを構築する."""
+from backend.interfaces.feature import FeatureBuilder
 
 
-class RawWorkTimeStrategy(FeatureStrategy):
-    """生の作業時間をそのまま特徴量として使用（デフォルト）."""
+class RawWorkTimeFeatureBuilder(FeatureBuilder):
+    """生の作業時間をそのまま特徴量行列にする（デフォルト）."""
 
-    def extract(self, work_times: list[float], timestamps: list[datetime]) -> np.ndarray:
+    def build(self, work_times: list[float]) -> np.ndarray:
         return np.array(work_times).reshape(-1, 1)

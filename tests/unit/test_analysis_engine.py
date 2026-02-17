@@ -1,32 +1,25 @@
-"""分析エンジンのユニットテスト（FeatureStrategy + トレンド分析）."""
-
-from datetime import datetime
+"""分析エンジンのユニットテスト（FeatureBuilder + トレンド分析）."""
 
 import numpy as np
 
-from backend.analysis.feature import RawWorkTimeStrategy
+from backend.analysis.feature import RawWorkTimeFeatureBuilder
 from backend.analysis.trend import WARNING_THRESHOLD, compute_trend
 
 
-class TestRawWorkTimeStrategy:
-    """RawWorkTimeStrategy の特徴量抽出テスト."""
+class TestRawWorkTimeFeatureBuilder:
+    """RawWorkTimeFeatureBuilder の特徴量構築テスト."""
 
-    def test_extract_returns_2d_array(self):
-        """既知データで特徴量抽出 → shape が (n, 1) であること."""
-        strategy = RawWorkTimeStrategy()
-        timestamps = [
-            datetime(2024, 1, 1),
-            datetime(2024, 1, 2),
-            datetime(2024, 1, 3),
-        ]
-        result = strategy.extract([10.0, 20.0, 30.0], timestamps)
+    def test_build_returns_2d_array(self):
+        """既知データで構築 → shape が (n, 1) であること."""
+        builder = RawWorkTimeFeatureBuilder()
+        result = builder.build([10.0, 20.0, 30.0])
         assert result.shape == (3, 1)
         np.testing.assert_array_equal(result.flatten(), [10.0, 20.0, 30.0])
 
-    def test_extract_empty(self):
+    def test_build_empty(self):
         """空リスト → shape (0, 1)."""
-        strategy = RawWorkTimeStrategy()
-        result = strategy.extract([], [])
+        builder = RawWorkTimeFeatureBuilder()
+        result = builder.build([])
         assert result.shape == (0, 1)
 
 
