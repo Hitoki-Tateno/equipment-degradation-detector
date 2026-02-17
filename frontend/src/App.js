@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Layout, Typography, Empty, Spin, Alert } from 'antd';
-import { DashboardOutlined } from '@ant-design/icons';
+import { Layout, Typography, Empty, Spin, Alert, Menu } from 'antd';
+import { DashboardOutlined, LineChartOutlined } from '@ant-design/icons';
 import CategoryTree from './components/CategoryTree';
 import WorkTimePlot from './components/WorkTimePlot';
 import ModelControls from './components/ModelControls';
+import Dashboard from './components/Dashboard';
 import {
   fetchCategories,
   fetchRecords,
@@ -18,6 +19,7 @@ const { Header, Sider, Content } = Layout;
 const { Title, Text } = Typography;
 
 function App() {
+  const [currentView, setCurrentView] = useState('dashboard');
   const [collapsed, setCollapsed] = useState(false);
   const [selectedCategoryId, setSelectedCategoryId] = useState(null);
 
@@ -150,6 +152,11 @@ function App() {
     );
   }, []);
 
+  const handleNavigateToPlot = useCallback((categoryId) => {
+    setCurrentView('plot');
+    loadCategoryData(categoryId);
+  }, [loadCategoryData]);
+
   return (
     <Layout style={{ minHeight: '100vh' }}>
       <Header className="header">
@@ -159,30 +166,43 @@ function App() {
             設備劣化検知システム
           </Title>
         </div>
+        <Menu
+          theme="dark"
+          mode="horizontal"
+          selectedKeys={[currentView]}
+          onClick={({ key }) => setCurrentView(key)}
+          items={[
+            { key: 'dashboard', icon: <DashboardOutlined />, label: 'ダッシュボード' },
+            { key: 'plot', icon: <LineChartOutlined />, label: 'プロット' },
+          ]}
+          style={{ marginLeft: 'auto', background: 'transparent' }}
+        />
       </Header>
       <Layout>
-        <Sider
-          collapsible
-          collapsed={collapsed}
-          onCollapse={setCollapsed}
-          width={280}
-          theme="light"
-          className="site-sider"
-        >
-          {!collapsed && (
-            <div style={{ padding: '16px' }}>
-              <Text type="secondary">分類選択</Text>
-              {loadingCategories ? (
-                <Spin style={{ display: 'block', marginTop: 24 }} />
-              ) : (
-                <CategoryTree
-                  categories={categories}
-                  onSelect={loadCategoryData}
-                />
-              )}
-            </div>
-          )}
-        </Sider>
+        {currentView === 'plot' && (
+          <Sider
+            collapsible
+            collapsed={collapsed}
+            onCollapse={setCollapsed}
+            width={280}
+            theme="light"
+            className="site-sider"
+          >
+            {!collapsed && (
+              <div style={{ padding: '16px' }}>
+                <Text type="secondary">分類選択</Text>
+                {loadingCategories ? (
+                  <Spin style={{ display: 'block', marginTop: 24 }} />
+                ) : (
+                  <CategoryTree
+                    categories={categories}
+                    onSelect={loadCategoryData}
+                  />
+                )}
+              </div>
+            )}
+          </Sider>
+        )}
         <Layout style={{ padding: '24px' }}>
           <Content className="site-content">
             {error && (
@@ -195,44 +215,53 @@ function App() {
                 style={{ marginBottom: 16 }}
               />
             )}
-            <div className="plot-container">
-              {selectedCategoryId ? (
-                <>
-                  <Title level={4}>作業時間プロット</Title>
-                  {loadingRecords ? (
-                    <Spin style={{ display: 'block', marginTop: 24 }} />
-                  ) : records.length > 0 ? (
-                    <>
-                      <WorkTimePlot
-                        records={records}
-                        trend={trend}
-                        anomalies={anomalies}
-                        sensitivity={sensitivity}
-                        baselineRange={baselineRange}
-                        excludedIndices={excludedIndices}
-                        modelStatus={modelStatus}
-                        onBaselineSelect={setBaselineRange}
-                        onToggleExclude={toggleExclude}
-                      />
-                      <ModelControls
-                        modelStatus={modelStatus}
-                        baselineRange={baselineRange}
-                        sensitivity={sensitivity}
-                        onSensitivityChange={setSensitivity}
-                        onSave={handleSaveModel}
-                        onDelete={handleDeleteModel}
-                        savingModel={savingModel}
-                        hasAnomalies={anomalies.length > 0}
-                      />
-                    </>
-                  ) : (
-                    <Empty description="この分類にはレコードがありません" />
-                  )}
-                </>
-              ) : (
-                <Empty description="左のツリーから分類を選択してください" />
-              )}
-            </div>
+            {currentView === 'dashboard' ? (
+              <div className="plot-container">
+                <Dashboard
+                  categories={categories}
+                  onNavigateToPlot={handleNavigateToPlot}
+                />
+              </div>
+            ) : (
+              <div className="plot-container">
+                {selectedCategoryId ? (
+                  <>
+                    <Title level={4}>作業時間プロット</Title>
+                    {loadingRecords ? (
+                      <Spin style={{ display: 'block', marginTop: 24 }} />
+                    ) : records.length > 0 ? (
+                      <>
+                        <WorkTimePlot
+                          records={records}
+                          trend={trend}
+                          anomalies={anomalies}
+                          sensitivity={sensitivity}
+                          baselineRange={baselineRange}
+                          excludedIndices={excludedIndices}
+                          modelStatus={modelStatus}
+                          onBaselineSelect={setBaselineRange}
+                          onToggleExclude={toggleExclude}
+                        />
+                        <ModelControls
+                          modelStatus={modelStatus}
+                          baselineRange={baselineRange}
+                          sensitivity={sensitivity}
+                          onSensitivityChange={setSensitivity}
+                          onSave={handleSaveModel}
+                          onDelete={handleDeleteModel}
+                          savingModel={savingModel}
+                          hasAnomalies={anomalies.length > 0}
+                        />
+                      </>
+                    ) : (
+                      <Empty description="この分類にはレコードがありません" />
+                    )}
+                  </>
+                ) : (
+                  <Empty description="左のツリーから分類を選択してください" />
+                )}
+              </div>
+            )}
           </Content>
         </Layout>
       </Layout>
