@@ -1,9 +1,15 @@
 .header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   padding: 0 24px;
   background: #001529;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.header .ant-menu {
+  flex: 0 0 auto;
+  min-width: 280px;
 }
 
 .logo {
