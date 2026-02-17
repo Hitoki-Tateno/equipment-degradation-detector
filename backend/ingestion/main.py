@@ -308,3 +308,28 @@ async def run_analysis(engine: EngineDep):
     """全末端カテゴリに対して分析を手動トリガーする。"""
     count = engine.run_all()
     return {"processed_categories": count}
+
+
+# ---------- デバッグ用エンドポイント ----------
+
+
+@app.delete("/api/debug/data", tags=["debug"])
+async def delete_all_data(store: StoreDep):
+    """【デバッグ用】作業記録・カテゴリを全削除する。"""
+    store.delete_all_data()
+    return {"deleted": "data"}
+
+
+@app.delete("/api/debug/results", tags=["debug"])
+async def delete_all_results(result_store: ResultStoreDep):
+    """【デバッグ用】分析結果・モデル定義を全削除する。"""
+    result_store.delete_all_data()
+    return {"deleted": "results"}
+
+
+@app.delete("/api/debug/all", tags=["debug"])
+async def delete_all(store: StoreDep, result_store: ResultStoreDep):
+    """【デバッグ用】全データを一括削除する。"""
+    result_store.delete_all_data()
+    store.delete_all_data()
+    return {"deleted": "all"}

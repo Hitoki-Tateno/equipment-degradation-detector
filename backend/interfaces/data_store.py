@@ -72,3 +72,8 @@ class DataStoreInterface(ABC):
     def get_category_tree(self, root_id: int | None = None) -> list[CategoryNode]:
         """分類ツリーを取得する。root_id省略時はツリー全体。"""
         ...
+
+    @abstractmethod
+    def delete_all_data(self) -> None:
+        """全データを削除する（デバッグ用）。"""
+        ...

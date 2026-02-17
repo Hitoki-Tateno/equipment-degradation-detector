@@ -157,3 +157,9 @@ class SqliteResultStore(ResultStoreInterface):
                 "DELETE FROM anomaly_results WHERE category_id = ?",
                 (category_id,),
             )
+
+    def delete_all_data(self) -> None:
+        with self._conn:
+            self._conn.execute("DELETE FROM anomaly_results")
+            self._conn.execute("DELETE FROM trend_results")
+            self._conn.execute("DELETE FROM model_definitions")
