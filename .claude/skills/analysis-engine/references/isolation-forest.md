@@ -57,5 +57,5 @@ def train_and_score(
 1. モデル定義からbaseline_start, baseline_endを取得
 2. Store層から該当期間のwork_recordsを取得
 3. excluded_pointsに含まれるrecorded_atのレコードを除外
-4. 特徴量戦略で特徴ベクトルに変換
+4. FeatureBuilderで特徴量行列に変換
 5. 上記をbaseline_dataとしてfit()に渡す

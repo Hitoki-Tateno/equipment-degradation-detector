@@ -1,6 +1,6 @@
 ---
 name: analysis-engine
-description: 分析層（Isolation Forest + 線形回帰）の実装。異常検知モデル、トレンド分析、特徴量構築の戦略パターン、スコア算出の実装時に使用する。「Isolation Forest」「回帰分析」「トレンド」「異常検知」「分析層」「特徴量」に関するタスクで発動する。
+description: 分析層（Isolation Forest + 線形回帰）の実装。異常検知モデル、トレンド分析、特徴量構築（FeatureBuilder）、スコア算出の実装時に使用する。「Isolation Forest」「回帰分析」「トレンド」「異常検知」「分析層」「特徴量」に関するタスクで発動する。
 ---
 
 # 分析層実装
@@ -36,23 +36,31 @@ class AnalysisEngine:
         ...
 ```
 
-## 特徴量構築（戦略パターン）
+## 特徴量構築（FeatureBuilder）
 
 特徴ベクトルの構築方法は差し替え可能な構造にする:
 
+- 契約: `backend/interfaces/feature.py` — `FeatureBuilder` ABC
+- 実装: `backend/analysis/feature.py` — `RawWorkTimeFeatureBuilder`
+
 ```python
+# backend/interfaces/feature.py
 from abc import ABC, abstractmethod
+from collections.abc import Sequence
 import numpy as np
 
-class FeatureStrategy(ABC):
-    @abstractmethod
-    def extract(self, work_times: list[float], timestamps: list[datetime]) -> np.ndarray:
-        ...
+class FeatureBuilder(ABC):
+    """Template Method: build() が ndim=2 を検証し、_build_impl() を呼ぶ。"""
+    def build(self, work_times: Sequence[float]) -> np.ndarray: ...
 
-class RawWorkTimeStrategy(FeatureStrategy):
-    """生の作業時間を特徴量として使用（デフォルト）。"""
-    def extract(self, work_times, timestamps):
-        return np.array(work_times).reshape(-1, 1)
+    @abstractmethod
+    def _build_impl(self, work_times: Sequence[float]) -> np.ndarray: ...
+
+# backend/analysis/feature.py
+class RawWorkTimeFeatureBuilder(FeatureBuilder):
+    """生の作業時間を特徴量行列にする（デフォルト、d=1）。"""
+    def _build_impl(self, work_times):
+        return np.array(list(work_times)).reshape(-1, 1)
 ```
 
 ユーザーには公開しない。変更は運用判断でシステム側が行う。
