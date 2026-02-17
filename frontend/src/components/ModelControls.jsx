@@ -4,6 +4,12 @@ import { SaveOutlined, DeleteOutlined } from '@ant-design/icons';
 
 const { Text } = Typography;
 
+const SENSITIVITY_MARKS = {
+  0.25: '低',
+  0.5: '中',
+  0.75: '高',
+};
+
 function ModelControls({
   modelStatus,
   baselineRange,
@@ -50,15 +56,15 @@ function ModelControls({
         )}
 
         <div>
-          <Text>感度: {sensitivity.toFixed(2)}</Text>
+          <Text>感度</Text>
           <Slider
-            min={0}
-            max={1}
-            step={0.01}
+            min={0.25}
+            max={0.75}
+            step={null}
+            marks={SENSITIVITY_MARKS}
             value={sensitivity}
             onChange={onSensitivityChange}
-            disabled={!hasAnomalies}
-            tooltip={{ formatter: (val) => `${(val * 100).toFixed(0)}%` }}
+            tooltip={{ formatter: null }}
           />
           {!hasAnomalies && (
             <Text type="secondary" style={{ fontSize: 12 }}>
