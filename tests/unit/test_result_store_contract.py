@@ -27,7 +27,9 @@ class TestTrendResults:
     """トレンド分析結果の契約テスト。"""
 
     def test_save_and_get(self, result_store: ResultStoreInterface):
-        result = TrendResult(category_id=1, slope=0.5, intercept=10.0, is_warning=False)
+        result = TrendResult(
+            category_id=1, slope=0.5, intercept=10.0, is_warning=False
+        )
         result_store.save_trend_result(result)
 
         loaded = result_store.get_trend_result(1)
@@ -36,12 +38,18 @@ class TestTrendResults:
         assert loaded.intercept == 10.0
         assert loaded.is_warning is False
 
-    def test_overwrite_on_same_category(self, result_store: ResultStoreInterface):
+    def test_overwrite_on_same_category(
+        self, result_store: ResultStoreInterface
+    ):
         result_store.save_trend_result(
-            TrendResult(category_id=1, slope=0.5, intercept=10.0, is_warning=False)
+            TrendResult(
+                category_id=1, slope=0.5, intercept=10.0, is_warning=False
+            )
         )
         result_store.save_trend_result(
-            TrendResult(category_id=1, slope=1.0, intercept=20.0, is_warning=True)
+            TrendResult(
+                category_id=1, slope=1.0, intercept=20.0, is_warning=True
+            )
         )
 
         loaded = result_store.get_trend_result(1)
@@ -49,7 +57,9 @@ class TestTrendResults:
         assert loaded.slope == 1.0
         assert loaded.is_warning is True
 
-    def test_returns_none_for_missing(self, result_store: ResultStoreInterface):
+    def test_returns_none_for_missing(
+        self, result_store: ResultStoreInterface
+    ):
         assert result_store.get_trend_result(999) is None
 
 
@@ -58,27 +68,47 @@ class TestAnomalyResults:
 
     def test_save_and_get(self, result_store: ResultStoreInterface):
         results = [
-            AnomalyResult(category_id=1, recorded_at=datetime(2025, 1, 1), anomaly_score=-0.3),
-            AnomalyResult(category_id=1, recorded_at=datetime(2025, 1, 2), anomaly_score=-0.8),
+            AnomalyResult(
+                category_id=1,
+                recorded_at=datetime(2025, 1, 1),
+                anomaly_score=-0.3,
+            ),
+            AnomalyResult(
+                category_id=1,
+                recorded_at=datetime(2025, 1, 2),
+                anomaly_score=-0.8,
+            ),
         ]
         result_store.save_anomaly_results(results)
 
         loaded = result_store.get_anomaly_results(1)
         assert len(loaded) == 2
 
-    def test_returns_empty_for_missing(self, result_store: ResultStoreInterface):
+    def test_returns_empty_for_missing(
+        self, result_store: ResultStoreInterface
+    ):
         assert result_store.get_anomaly_results(999) == []
 
     def test_delete_anomaly_results(self, result_store: ResultStoreInterface):
         results = [
-            AnomalyResult(category_id=1, recorded_at=datetime(2025, 1, 1), anomaly_score=-0.3),
-            AnomalyResult(category_id=1, recorded_at=datetime(2025, 1, 2), anomaly_score=-0.8),
+            AnomalyResult(
+                category_id=1,
+                recorded_at=datetime(2025, 1, 1),
+                anomaly_score=-0.3,
+            ),
+            AnomalyResult(
+                category_id=1,
+                recorded_at=datetime(2025, 1, 2),
+                anomaly_score=-0.8,
+            ),
         ]
         result_store.save_anomaly_results(results)
         result_store.delete_anomaly_results(1)
         assert result_store.get_anomaly_results(1) == []
 
-    def test_delete_anomaly_results_idempotent(self, result_store: ResultStoreInterface):
+    def test_delete_anomaly_results_idempotent(
+        self, result_store: ResultStoreInterface
+    ):
         result_store.delete_anomaly_results(999)
 
 
@@ -100,7 +130,9 @@ class TestModelDefinitions:
         assert loaded.sensitivity == 0.5
         assert len(loaded.excluded_points) == 1
 
-    def test_returns_none_for_missing(self, result_store: ResultStoreInterface):
+    def test_returns_none_for_missing(
+        self, result_store: ResultStoreInterface
+    ):
         assert result_store.get_model_definition(999) is None
 
     def test_delete_model_definition(self, result_store: ResultStoreInterface):
@@ -115,5 +147,7 @@ class TestModelDefinitions:
         result_store.delete_model_definition(1)
         assert result_store.get_model_definition(1) is None
 
-    def test_delete_model_definition_idempotent(self, result_store: ResultStoreInterface):
+    def test_delete_model_definition_idempotent(
+        self, result_store: ResultStoreInterface
+    ):
         result_store.delete_model_definition(999)

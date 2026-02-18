@@ -12,9 +12,20 @@ from fastapi import Depends, FastAPI, HTTPException, UploadFile
 from pydantic import BaseModel
 
 from backend.analysis.engine import AnalysisEngine
-from backend.dependencies import get_analysis_engine, get_data_store, get_result_store
-from backend.interfaces.data_store import CategoryNode, DataStoreInterface, WorkRecord
-from backend.interfaces.result_store import ModelDefinition, ResultStoreInterface
+from backend.dependencies import (
+    get_analysis_engine,
+    get_data_store,
+    get_result_store,
+)
+from backend.interfaces.data_store import (
+    CategoryNode,
+    DataStoreInterface,
+    WorkRecord,
+)
+from backend.interfaces.result_store import (
+    ModelDefinition,
+    ResultStoreInterface,
+)
 
 StoreDep = Annotated[DataStoreInterface, Depends(get_data_store)]
 ResultStoreDep = Annotated[ResultStoreInterface, Depends(get_result_store)]
@@ -155,17 +166,24 @@ async def post_records_csv(
 
     if "work_time" not in df.columns or "recorded_at" not in df.columns:
         raise HTTPException(
-            status_code=400, detail="work_time and recorded_at columns are required"
+            status_code=400,
+            detail="work_time and recorded_at columns are required",
         )
 
     df["recorded_at"] = pd.to_datetime(df["recorded_at"])
-    category_columns = [c for c in df.columns if c not in ("work_time", "recorded_at")]
+    category_columns = [
+        c for c in df.columns if c not in ("work_time", "recorded_at")
+    ]
 
     work_records: list[WorkRecord] = []
     affected_category_ids: set[int] = set()
     skipped = 0
     for _, row in df.iterrows():
-        path = [str(row[c]) for c in category_columns if pd.notna(row[c]) and str(row[c]).strip()]
+        path = [
+            str(row[c])
+            for c in category_columns
+            if pd.notna(row[c]) and str(row[c]).strip()
+        ]
         if not path:
             skipped += 1
             continue
@@ -252,7 +270,9 @@ async def get_model_definition(
     """モデル定義を取得する。未定義なら 404。"""
     definition = result_store.get_model_definition(category_id)
     if definition is None:
-        raise HTTPException(status_code=404, detail="Model definition not found")
+        raise HTTPException(
+            status_code=404, detail="Model definition not found"
+        )
     return ModelDefinitionResponse(
         category_id=definition.category_id,
         baseline_start=definition.baseline_start,
@@ -268,7 +288,10 @@ async def put_model_definition(
     body: ModelDefinitionRequest,
     result_store: ResultStoreDep,
 ):
-    """モデル定義を保存する。ベースライン変更があれば retrained フラグを返す。"""
+    """モデル定義を保存する。
+
+    ベースライン変更があれば retrained フラグを返す。
+    """
     existing = result_store.get_model_definition(category_id)
     retrained = False
     if existing is not None:
@@ -297,7 +320,9 @@ async def delete_model_definition_endpoint(
     """モデル定義を削除する。異常検知結果もカスケード削除。未定義なら404。"""
     existing = result_store.get_model_definition(category_id)
     if existing is None:
-        raise HTTPException(status_code=404, detail="Model definition not found")
+        raise HTTPException(
+            status_code=404, detail="Model definition not found"
+        )
     result_store.delete_anomaly_results(category_id)
     result_store.delete_model_definition(category_id)
     return {"deleted": True}

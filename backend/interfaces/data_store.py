@@ -69,7 +69,9 @@ class DataStoreInterface(ABC):
         ...
 
     @abstractmethod
-    def get_category_tree(self, root_id: int | None = None) -> list[CategoryNode]:
+    def get_category_tree(
+        self, root_id: int | None = None
+    ) -> list[CategoryNode]:
         """分類ツリーを取得する。root_id省略時はツリー全体。"""
         ...
 

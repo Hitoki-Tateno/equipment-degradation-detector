@@ -42,7 +42,9 @@ CREATE TABLE IF NOT EXISTS model_definitions (
 """
 
 sqlite3.register_adapter(datetime, lambda dt: dt.isoformat())
-sqlite3.register_converter("TIMESTAMP", lambda b: datetime.fromisoformat(b.decode()))
+sqlite3.register_converter(
+    "TIMESTAMP", lambda b: datetime.fromisoformat(b.decode())
+)
 
 
 class SqliteResultStore(ResultStoreInterface):
@@ -62,14 +64,20 @@ class SqliteResultStore(ResultStoreInterface):
         with self._conn:
             self._conn.execute(
                 """
-                INSERT INTO trend_results (category_id, slope, intercept, is_warning)
+                INSERT INTO trend_results
+                    (category_id, slope, intercept, is_warning)
                 VALUES (?, ?, ?, ?)
                 ON CONFLICT(category_id)
                 DO UPDATE SET slope = excluded.slope,
                               intercept = excluded.intercept,
                               is_warning = excluded.is_warning
                 """,
-                (result.category_id, result.slope, result.intercept, result.is_warning),
+                (
+                    result.category_id,
+                    result.slope,
+                    result.intercept,
+                    result.is_warning,
+                ),
             )
 
     def get_trend_result(self, category_id: int) -> TrendResult | None:
@@ -81,19 +89,26 @@ class SqliteResultStore(ResultStoreInterface):
         if row is None:
             return None
         return TrendResult(
-            category_id=row[0], slope=row[1], intercept=row[2], is_warning=bool(row[3])
+            category_id=row[0],
+            slope=row[1],
+            intercept=row[2],
+            is_warning=bool(row[3]),
         )
 
     def save_anomaly_results(self, results: list[AnomalyResult]) -> None:
         with self._conn:
             self._conn.executemany(
                 """
-                INSERT INTO anomaly_results (category_id, recorded_at, anomaly_score)
+                INSERT INTO anomaly_results
+                    (category_id, recorded_at, anomaly_score)
                 VALUES (?, ?, ?)
                 ON CONFLICT(category_id, recorded_at)
                 DO UPDATE SET anomaly_score = excluded.anomaly_score
                 """,
-                [(r.category_id, r.recorded_at, r.anomaly_score) for r in results],
+                [
+                    (r.category_id, r.recorded_at, r.anomaly_score)
+                    for r in results
+                ],
             )
 
     def get_anomaly_results(self, category_id: int) -> list[AnomalyResult]:
@@ -102,15 +117,23 @@ class SqliteResultStore(ResultStoreInterface):
             " FROM anomaly_results WHERE category_id = ?",
             (category_id,),
         ).fetchall()
-        return [AnomalyResult(category_id=r[0], recorded_at=r[1], anomaly_score=r[2]) for r in rows]
+        return [
+            AnomalyResult(
+                category_id=r[0], recorded_at=r[1], anomaly_score=r[2]
+            )
+            for r in rows
+        ]
 
     def save_model_definition(self, definition: ModelDefinition) -> None:
-        excluded_json = json.dumps([dt.isoformat() for dt in definition.excluded_points])
+        excluded_json = json.dumps(
+            [dt.isoformat() for dt in definition.excluded_points]
+        )
         with self._conn:
             self._conn.execute(
                 """
                 INSERT INTO model_definitions
-                    (category_id, baseline_start, baseline_end, sensitivity, excluded_points)
+                    (category_id, baseline_start, baseline_end,
+                     sensitivity, excluded_points)
                 VALUES (?, ?, ?, ?, ?)
                 ON CONFLICT(category_id)
                 DO UPDATE SET baseline_start = excluded.baseline_start,
@@ -129,7 +152,8 @@ class SqliteResultStore(ResultStoreInterface):
 
     def get_model_definition(self, category_id: int) -> ModelDefinition | None:
         row = self._conn.execute(
-            "SELECT category_id, baseline_start, baseline_end, sensitivity, excluded_points"
+            "SELECT category_id, baseline_start,"
+            " baseline_end, sensitivity, excluded_points"
             " FROM model_definitions WHERE category_id = ?",
             (category_id,),
         ).fetchone()
