@@ -36,7 +36,7 @@ def _collect_imports(filepath: Path) -> list[str]:
 
 
 def test_no_direct_store_imports():
-    """analysis/ と ingestion/ が store/ や result_store/ を直接importしていないことを検証。"""
+    """analysis/とingestion/がstore/を直接importしていないことを検証."""
     violations = []
 
     for module_name in RESTRICTED_MODULES:
@@ -52,4 +52,6 @@ def test_no_direct_store_imports():
                         rel_path = py_file.relative_to(BACKEND_ROOT.parent)
                         violations.append(f"{rel_path}: imports {imp}")
 
-    assert violations == [], "依存方向違反を検出:\n" + "\n".join(f"  - {v}" for v in violations)
+    assert violations == [], "依存方向違反を検出:\n" + "\n".join(
+        f"  - {v}" for v in violations
+    )

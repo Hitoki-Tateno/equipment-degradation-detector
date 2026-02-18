@@ -30,7 +30,9 @@ class FeatureBuilder(ABC):
         """
         result = self._build_impl(work_times)
         if result.ndim != 2:
-            raise ValueError(f"FeatureBuilder must return 2D array, got {result.ndim}D")
+            raise ValueError(
+                f"FeatureBuilder must return 2D array, got {result.ndim}D"
+            )
         return result
 
     @abstractmethod

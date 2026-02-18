@@ -118,7 +118,13 @@ class TestCsvPostTriggersAnalysis:
         )
         resp = client.post(
             "/api/records/csv",
-            files={"file": ("test.csv", io.BytesIO(csv_content.encode()), "text/csv")},
+            files={
+                "file": (
+                    "test.csv",
+                    io.BytesIO(csv_content.encode()),
+                    "text/csv",
+                )
+            },
         )
         assert resp.status_code == 200
         assert resp.json()["inserted"] == 3

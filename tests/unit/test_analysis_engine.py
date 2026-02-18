@@ -1,4 +1,7 @@
-"""分析エンジンのユニットテスト（FeatureBuilder + トレンド分析 + オーケストレータ）."""
+"""分析エンジンのユニットテスト.
+
+FeatureBuilder + トレンド分析 + オーケストレータ。
+"""
 
 from datetime import datetime
 from unittest.mock import MagicMock
@@ -9,7 +12,11 @@ import pytest
 from backend.analysis.engine import AnalysisEngine
 from backend.analysis.feature import RawWorkTimeFeatureBuilder
 from backend.analysis.trend import WARNING_THRESHOLD, compute_trend
-from backend.interfaces.data_store import CategoryNode, DataStoreInterface, WorkRecord
+from backend.interfaces.data_store import (
+    CategoryNode,
+    DataStoreInterface,
+    WorkRecord,
+)
 from backend.interfaces.feature import FeatureBuilder
 from backend.interfaces.result_store import ResultStoreInterface, TrendResult
 
@@ -126,7 +133,9 @@ class TestCollectLeaves:
                         name="Mid",
                         parent_id=1,
                         children=[
-                            CategoryNode(id=3, name="Leaf", parent_id=2, children=[]),
+                            CategoryNode(
+                                id=3, name="Leaf", parent_id=2, children=[]
+                            ),
                         ],
                     ),
                 ],
@@ -144,12 +153,20 @@ class TestCollectLeaves:
 class TestAnalysisEngineRun:
     """AnalysisEngine.run() のユニットテスト."""
 
-    def test_computes_trend_and_saves(self, engine, mock_data_store, mock_result_store):
+    def test_computes_trend_and_saves(
+        self, engine, mock_data_store, mock_result_store
+    ):
         """レコード有り → トレンド計算して結果保存."""
         records = [
-            WorkRecord(category_id=1, work_time=10.0, recorded_at=datetime(2025, 1, 1)),
-            WorkRecord(category_id=1, work_time=20.0, recorded_at=datetime(2025, 2, 1)),
-            WorkRecord(category_id=1, work_time=30.0, recorded_at=datetime(2025, 3, 1)),
+            WorkRecord(
+                category_id=1, work_time=10.0, recorded_at=datetime(2025, 1, 1)
+            ),
+            WorkRecord(
+                category_id=1, work_time=20.0, recorded_at=datetime(2025, 2, 1)
+            ),
+            WorkRecord(
+                category_id=1, work_time=30.0, recorded_at=datetime(2025, 3, 1)
+            ),
         ]
         mock_data_store.get_records.return_value = records
         mock_result_store.get_model_definition.return_value = None
@@ -163,7 +180,9 @@ class TestAnalysisEngineRun:
         assert saved.category_id == 1
         assert saved.slope > 0
 
-    def test_no_records_does_not_save(self, engine, mock_data_store, mock_result_store):
+    def test_no_records_does_not_save(
+        self, engine, mock_data_store, mock_result_store
+    ):
         """レコード無し → save_trend_result 呼ばれない."""
         mock_data_store.get_records.return_value = []
 
@@ -171,10 +190,14 @@ class TestAnalysisEngineRun:
 
         mock_result_store.save_trend_result.assert_not_called()
 
-    def test_checks_model_definition(self, engine, mock_data_store, mock_result_store):
+    def test_checks_model_definition(
+        self, engine, mock_data_store, mock_result_store
+    ):
         """run() は get_model_definition を呼ぶ."""
         records = [
-            WorkRecord(category_id=1, work_time=10.0, recorded_at=datetime(2025, 1, 1)),
+            WorkRecord(
+                category_id=1, work_time=10.0, recorded_at=datetime(2025, 1, 1)
+            ),
         ]
         mock_data_store.get_records.return_value = records
         mock_result_store.get_model_definition.return_value = None
@@ -183,12 +206,20 @@ class TestAnalysisEngineRun:
 
         mock_result_store.get_model_definition.assert_called_once_with(1)
 
-    def test_sorts_by_recorded_at(self, engine, mock_data_store, mock_result_store):
+    def test_sorts_by_recorded_at(
+        self, engine, mock_data_store, mock_result_store
+    ):
         """逆順レコード → ソートされてトレンド計算."""
         records = [
-            WorkRecord(category_id=1, work_time=30.0, recorded_at=datetime(2025, 3, 1)),
-            WorkRecord(category_id=1, work_time=10.0, recorded_at=datetime(2025, 1, 1)),
-            WorkRecord(category_id=1, work_time=20.0, recorded_at=datetime(2025, 2, 1)),
+            WorkRecord(
+                category_id=1, work_time=30.0, recorded_at=datetime(2025, 3, 1)
+            ),
+            WorkRecord(
+                category_id=1, work_time=10.0, recorded_at=datetime(2025, 1, 1)
+            ),
+            WorkRecord(
+                category_id=1, work_time=20.0, recorded_at=datetime(2025, 2, 1)
+            ),
         ]
         mock_data_store.get_records.return_value = records
         mock_result_store.get_model_definition.return_value = None
@@ -201,7 +232,9 @@ class TestAnalysisEngineRun:
     def test_single_record(self, engine, mock_data_store, mock_result_store):
         """1件のみ → エラーなく保存される."""
         records = [
-            WorkRecord(category_id=1, work_time=10.0, recorded_at=datetime(2025, 1, 1)),
+            WorkRecord(
+                category_id=1, work_time=10.0, recorded_at=datetime(2025, 1, 1)
+            ),
         ]
         mock_data_store.get_records.return_value = records
         mock_result_store.get_model_definition.return_value = None
@@ -216,7 +249,9 @@ class TestAnalysisEngineRun:
 class TestAnalysisEngineRunAll:
     """AnalysisEngine.run_all() のユニットテスト."""
 
-    def test_calls_run_for_each_leaf(self, engine, mock_data_store, mock_result_store):
+    def test_calls_run_for_each_leaf(
+        self, engine, mock_data_store, mock_result_store
+    ):
         """末端カテゴリごとに run() が呼ばれる."""
         tree = [
             CategoryNode(
@@ -224,14 +259,20 @@ class TestAnalysisEngineRunAll:
                 name="ProcessA",
                 parent_id=None,
                 children=[
-                    CategoryNode(id=2, name="Equip1", parent_id=1, children=[]),
-                    CategoryNode(id=3, name="Equip2", parent_id=1, children=[]),
+                    CategoryNode(
+                        id=2, name="Equip1", parent_id=1, children=[]
+                    ),
+                    CategoryNode(
+                        id=3, name="Equip2", parent_id=1, children=[]
+                    ),
                 ],
             ),
         ]
         mock_data_store.get_category_tree.return_value = tree
         mock_data_store.get_records.return_value = [
-            WorkRecord(category_id=2, work_time=10.0, recorded_at=datetime(2025, 1, 1)),
+            WorkRecord(
+                category_id=2, work_time=10.0, recorded_at=datetime(2025, 1, 1)
+            ),
         ]
         mock_result_store.get_model_definition.return_value = None
 

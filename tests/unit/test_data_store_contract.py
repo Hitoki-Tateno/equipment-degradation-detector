@@ -32,8 +32,16 @@ class TestUpsertRecords:
         """新規レコードが正しく投入される。"""
         category_id = data_store.ensure_category_path(["プロセスA", "設備1"])
         records = [
-            WorkRecord(category_id=category_id, work_time=10.5, recorded_at=datetime(2025, 1, 1)),
-            WorkRecord(category_id=category_id, work_time=11.0, recorded_at=datetime(2025, 1, 2)),
+            WorkRecord(
+                category_id=category_id,
+                work_time=10.5,
+                recorded_at=datetime(2025, 1, 1),
+            ),
+            WorkRecord(
+                category_id=category_id,
+                work_time=11.0,
+                recorded_at=datetime(2025, 1, 2),
+            ),
         ]
         count = data_store.upsert_records(records)
         assert count == 2
@@ -41,16 +49,26 @@ class TestUpsertRecords:
         result = data_store.get_records(category_id)
         assert len(result) == 2
 
-    def test_upsert_overwrites_on_duplicate_key(self, data_store: DataStoreInterface):
+    def test_upsert_overwrites_on_duplicate_key(
+        self, data_store: DataStoreInterface
+    ):
         """分類×タイムスタンプが一致するレコードは上書きされる。"""
         category_id = data_store.ensure_category_path(["プロセスA", "設備1"])
         ts = datetime(2025, 1, 1)
 
         data_store.upsert_records(
-            [WorkRecord(category_id=category_id, work_time=10.0, recorded_at=ts)]
+            [
+                WorkRecord(
+                    category_id=category_id, work_time=10.0, recorded_at=ts
+                )
+            ]
         )
         data_store.upsert_records(
-            [WorkRecord(category_id=category_id, work_time=20.0, recorded_at=ts)]
+            [
+                WorkRecord(
+                    category_id=category_id, work_time=20.0, recorded_at=ts
+                )
+            ]
         )
 
         result = data_store.get_records(category_id)
@@ -71,9 +89,21 @@ class TestGetRecords:
         """期間指定でフィルタされる。"""
         category_id = data_store.ensure_category_path(["プロセスA", "設備1"])
         records = [
-            WorkRecord(category_id=category_id, work_time=10.0, recorded_at=datetime(2025, 1, 1)),
-            WorkRecord(category_id=category_id, work_time=11.0, recorded_at=datetime(2025, 2, 1)),
-            WorkRecord(category_id=category_id, work_time=12.0, recorded_at=datetime(2025, 3, 1)),
+            WorkRecord(
+                category_id=category_id,
+                work_time=10.0,
+                recorded_at=datetime(2025, 1, 1),
+            ),
+            WorkRecord(
+                category_id=category_id,
+                work_time=11.0,
+                recorded_at=datetime(2025, 2, 1),
+            ),
+            WorkRecord(
+                category_id=category_id,
+                work_time=12.0,
+                recorded_at=datetime(2025, 3, 1),
+            ),
         ]
         data_store.upsert_records(records)
 
@@ -83,12 +113,22 @@ class TestGetRecords:
         assert len(result) == 1
         assert result[0].work_time == 11.0
 
-    def test_returns_sorted_by_recorded_at(self, data_store: DataStoreInterface):
+    def test_returns_sorted_by_recorded_at(
+        self, data_store: DataStoreInterface
+    ):
         """結果はrecorded_at昇順でソートされる。"""
         category_id = data_store.ensure_category_path(["プロセスA", "設備1"])
         records = [
-            WorkRecord(category_id=category_id, work_time=12.0, recorded_at=datetime(2025, 3, 1)),
-            WorkRecord(category_id=category_id, work_time=10.0, recorded_at=datetime(2025, 1, 1)),
+            WorkRecord(
+                category_id=category_id,
+                work_time=12.0,
+                recorded_at=datetime(2025, 3, 1),
+            ),
+            WorkRecord(
+                category_id=category_id,
+                work_time=10.0,
+                recorded_at=datetime(2025, 1, 1),
+            ),
         ]
         data_store.upsert_records(records)
 
@@ -104,7 +144,9 @@ class TestCategoryTree:
         category_id = data_store.ensure_category_path(["プロセスA", "設備1"])
         assert isinstance(category_id, int)
 
-    def test_ensure_returns_same_id_for_same_path(self, data_store: DataStoreInterface):
+    def test_ensure_returns_same_id_for_same_path(
+        self, data_store: DataStoreInterface
+    ):
         """同じパスに対しては同じIDが返る。"""
         id1 = data_store.ensure_category_path(["プロセスA", "設備1"])
         id2 = data_store.ensure_category_path(["プロセスA", "設備1"])

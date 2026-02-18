@@ -7,7 +7,9 @@ WARNING_THRESHOLD: float = 0.5
 """slope がこの値を超えた場合に警告フラグを立てる（仮値）."""
 
 
-def compute_trend(n_values: np.ndarray, work_times: np.ndarray) -> tuple[float, float, bool]:
+def compute_trend(
+    n_values: np.ndarray, work_times: np.ndarray
+) -> tuple[float, float, bool]:
     """線形回帰でトレンドを算出する.
 
     Args:

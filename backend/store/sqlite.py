@@ -3,7 +3,11 @@
 import sqlite3
 from datetime import datetime
 
-from backend.interfaces.data_store import CategoryNode, DataStoreInterface, WorkRecord
+from backend.interfaces.data_store import (
+    CategoryNode,
+    DataStoreInterface,
+    WorkRecord,
+)
 
 SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS categories (
@@ -27,7 +31,9 @@ CREATE INDEX IF NOT EXISTS idx_work_records_category_time
 
 # datetime adapter/converter をモジュールレベルで一度だけ登録
 sqlite3.register_adapter(datetime, lambda dt: dt.isoformat())
-sqlite3.register_converter("TIMESTAMP", lambda b: datetime.fromisoformat(b.decode()))
+sqlite3.register_converter(
+    "TIMESTAMP", lambda b: datetime.fromisoformat(b.decode())
+)
 
 
 class SqliteDataStore(DataStoreInterface):
@@ -63,14 +69,16 @@ class SqliteDataStore(DataStoreInterface):
         with self._conn:
             for name in path:
                 row = self._conn.execute(
-                    "SELECT id FROM categories WHERE name = ? AND parent_id IS ?",
+                    "SELECT id FROM categories"
+                    " WHERE name = ? AND parent_id IS ?",
                     (name, parent_id),
                 ).fetchone()
                 if row:
                     parent_id = row[0]
                 else:
                     cursor = self._conn.execute(
-                        "INSERT INTO categories (name, parent_id) VALUES (?, ?)",
+                        "INSERT INTO categories"
+                        " (name, parent_id) VALUES (?, ?)",
                         (name, parent_id),
                     )
                     parent_id = cursor.lastrowid
@@ -82,7 +90,10 @@ class SqliteDataStore(DataStoreInterface):
         start: datetime | None = None,
         end: datetime | None = None,
     ) -> list[WorkRecord]:
-        query = "SELECT category_id, work_time, recorded_at FROM work_records WHERE category_id = ?"
+        query = (
+            "SELECT category_id, work_time, recorded_at"
+            " FROM work_records WHERE category_id = ?"
+        )
         params: list = [category_id]
         if start is not None:
             query += " AND recorded_at >= ?"
@@ -93,9 +104,14 @@ class SqliteDataStore(DataStoreInterface):
         query += " ORDER BY recorded_at ASC"
 
         rows = self._conn.execute(query, params).fetchall()
-        return [WorkRecord(category_id=r[0], work_time=r[1], recorded_at=r[2]) for r in rows]
+        return [
+            WorkRecord(category_id=r[0], work_time=r[1], recorded_at=r[2])
+            for r in rows
+        ]
 
-    def get_category_tree(self, root_id: int | None = None) -> list[CategoryNode]:
+    def get_category_tree(
+        self, root_id: int | None = None
+    ) -> list[CategoryNode]:
         if root_id is None:
             seed_where = "WHERE parent_id IS NULL"
             params: tuple = ()
@@ -125,8 +141,12 @@ class SqliteDataStore(DataStoreInterface):
 
         def build_node(node_id: int) -> CategoryNode:
             nid, name, pid = node_data[node_id]
-            children = [build_node(cid) for cid in children_map.get(node_id, [])]
-            return CategoryNode(id=nid, name=name, parent_id=pid, children=children)
+            children = [
+                build_node(cid) for cid in children_map.get(node_id, [])
+            ]
+            return CategoryNode(
+                id=nid, name=name, parent_id=pid, children=children
+            )
 
         if root_id is not None:
             return [build_node(root_id)] if root_id in node_data else []
