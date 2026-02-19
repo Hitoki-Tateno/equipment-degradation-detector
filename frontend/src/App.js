@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Layout, Typography, Empty, Spin, Alert, Menu } from 'antd';
 import { DashboardOutlined, LineChartOutlined } from '@ant-design/icons';
 import CategoryTree from './components/CategoryTree';
@@ -17,6 +17,19 @@ import './App.css';
 
 const { Header, Sider, Content } = Layout;
 const { Title, Text } = Typography;
+
+const STYLE_LAYOUT_ROOT = { minHeight: '100vh' };
+const STYLE_ICON_HEADER = {
+  fontSize: '24px',
+  color: '#fff',
+  marginRight: '12px',
+};
+const STYLE_TITLE_HEADER = { color: '#fff', margin: 0, display: 'inline' };
+const STYLE_MENU_NAV = { marginLeft: 'auto', background: 'transparent' };
+const STYLE_PADDING_16 = { padding: '16px' };
+const STYLE_SPINNER = { display: 'block', marginTop: 24 };
+const STYLE_CONTENT_PADDING = { padding: '24px' };
+const STYLE_ALERT_MB = { marginBottom: 16 };
 
 function App() {
   const [currentView, setCurrentView] = useState('dashboard');
@@ -157,12 +170,23 @@ function App() {
     loadCategoryData(categoryId);
   }, [loadCategoryData]);
 
+  const menuItems = useMemo(
+    () => [
+      { key: 'dashboard', icon: <DashboardOutlined />, label: 'ダッシュボード' },
+      { key: 'plot', icon: <LineChartOutlined />, label: 'プロット' },
+    ],
+    [],
+  );
+
+  const handleMenuClick = useCallback(({ key }) => setCurrentView(key), []);
+  const handleCloseError = useCallback(() => setError(null), []);
+
   return (
-    <Layout style={{ minHeight: '100vh' }}>
+    <Layout style={STYLE_LAYOUT_ROOT}>
       <Header className="header">
         <div className="logo">
-          <DashboardOutlined style={{ fontSize: '24px', color: '#fff', marginRight: '12px' }} />
-          <Title level={3} style={{ color: '#fff', margin: 0, display: 'inline' }}>
+          <DashboardOutlined style={STYLE_ICON_HEADER} />
+          <Title level={3} style={STYLE_TITLE_HEADER}>
             設備劣化検知システム
           </Title>
         </div>
@@ -170,12 +194,9 @@ function App() {
           theme="dark"
           mode="horizontal"
           selectedKeys={[currentView]}
-          onClick={({ key }) => setCurrentView(key)}
-          items={[
-            { key: 'dashboard', icon: <DashboardOutlined />, label: 'ダッシュボード' },
-            { key: 'plot', icon: <LineChartOutlined />, label: 'プロット' },
-          ]}
-          style={{ marginLeft: 'auto', background: 'transparent' }}
+          onClick={handleMenuClick}
+          items={menuItems}
+          style={STYLE_MENU_NAV}
         />
       </Header>
       <Layout>
@@ -189,10 +210,10 @@ function App() {
             className="site-sider"
           >
             {!collapsed && (
-              <div style={{ padding: '16px' }}>
+              <div style={STYLE_PADDING_16}>
                 <Text type="secondary">分類選択</Text>
                 {loadingCategories ? (
-                  <Spin style={{ display: 'block', marginTop: 24 }} />
+                  <Spin style={STYLE_SPINNER} />
                 ) : (
                   <CategoryTree
                     categories={categories}
@@ -203,7 +224,7 @@ function App() {
             )}
           </Sider>
         )}
-        <Layout style={{ padding: '24px' }}>
+        <Layout style={STYLE_CONTENT_PADDING}>
           <Content className="site-content">
             {error && (
               <Alert
@@ -211,8 +232,8 @@ function App() {
                 type="error"
                 showIcon
                 closable
-                onClose={() => setError(null)}
-                style={{ marginBottom: 16 }}
+                onClose={handleCloseError}
+                style={STYLE_ALERT_MB}
               />
             )}
             {currentView === 'dashboard' ? (
@@ -228,7 +249,7 @@ function App() {
                   <>
                     <Title level={4}>作業時間プロット</Title>
                     {loadingRecords ? (
-                      <Spin style={{ display: 'block', marginTop: 24 }} />
+                      <Spin style={STYLE_SPINNER} />
                     ) : records.length > 0 ? (
                       <>
                         <WorkTimePlot

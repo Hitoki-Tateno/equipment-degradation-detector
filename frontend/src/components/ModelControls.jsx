@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { Slider, Button, Space, Modal, Typography, Tag } from 'antd';
 import { SaveOutlined, DeleteOutlined } from '@ant-design/icons';
 
@@ -10,6 +10,10 @@ const SENSITIVITY_MARKS = {
   0.75: '高',
 };
 
+const STYLE_SPACE_FULL = { width: '100%' };
+const STYLE_TOOLTIP_NULL = { formatter: null };
+const STYLE_HINT_TEXT = { fontSize: 12 };
+
 function ModelControls({
   modelStatus,
   baselineRange,
@@ -20,7 +24,7 @@ function ModelControls({
   savingModel,
   hasAnomalies,
 }) {
-  const handleDelete = () => {
+  const handleDelete = useCallback(() => {
     Modal.confirm({
       title: 'モデルを削除しますか？',
       content: '異常検知結果もすべて削除されます。この操作は取り消せません。',
@@ -29,11 +33,19 @@ function ModelControls({
       cancelText: 'キャンセル',
       onOk: onDelete,
     });
-  };
+  }, [onDelete]);
+
+  const baselineDateDisplay = useMemo(() => {
+    if (!baselineRange) return null;
+    return {
+      start: new Date(baselineRange.start).toLocaleDateString(),
+      end: new Date(baselineRange.end).toLocaleDateString(),
+    };
+  }, [baselineRange]);
 
   return (
     <div className="model-controls">
-      <Space direction="vertical" style={{ width: '100%' }} size="middle">
+      <Space direction="vertical" style={STYLE_SPACE_FULL} size="middle">
         <Space>
           <Text strong>モデル状態:</Text>
           {modelStatus === 'defined' ? (
@@ -43,10 +55,10 @@ function ModelControls({
           )}
         </Space>
 
-        {baselineRange && (
+        {baselineDateDisplay && (
           <Text type="secondary">
-            ベースライン期間: {new Date(baselineRange.start).toLocaleDateString()} 〜{' '}
-            {new Date(baselineRange.end).toLocaleDateString()}
+            ベースライン期間: {baselineDateDisplay.start} 〜{' '}
+            {baselineDateDisplay.end}
           </Text>
         )}
         {!baselineRange && modelStatus === 'undefined' && (
@@ -64,10 +76,10 @@ function ModelControls({
             marks={SENSITIVITY_MARKS}
             value={sensitivity}
             onChange={onSensitivityChange}
-            tooltip={{ formatter: null }}
+            tooltip={STYLE_TOOLTIP_NULL}
           />
           {!hasAnomalies && (
-            <Text type="secondary" style={{ fontSize: 12 }}>
+            <Text type="secondary" style={STYLE_HINT_TEXT}>
               モデルを保存すると異常検知が有効になります
             </Text>
           )}
@@ -95,4 +107,4 @@ function ModelControls({
   );
 }
 
-export default ModelControls;
+export default React.memo(ModelControls);
