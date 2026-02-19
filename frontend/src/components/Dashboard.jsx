@@ -1,10 +1,19 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Table, Tag, Button, Space, Modal, Typography, Alert, message } from 'antd';
 import { DeleteOutlined, ThunderboltOutlined, LineChartOutlined } from '@ant-design/icons';
 import { fetchResults, fetchModelDefinition, deleteModelDefinition, triggerAnalysis } from '../services/api';
 import { flattenLeafCategories } from '../utils/categoryUtils';
 
 const { Title } = Typography;
+
+const STYLE_ALERT_MB = { marginBottom: 16 };
+const STYLE_HEADER_ROW = {
+  marginBottom: 16,
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+};
+const STYLE_TITLE_INLINE = { margin: 0 };
 
 function Dashboard({ categories, onNavigateToPlot }) {
   const [dashboardData, setDashboardData] = useState([]);
@@ -60,95 +69,101 @@ function Dashboard({ categories, onNavigateToPlot }) {
     }
   };
 
-  const handleDeleteModel = (categoryId) => {
-    Modal.confirm({
-      title: 'モデルを削除しますか？',
-      content: '異常検知結果もすべて削除されます。この操作は取り消せません。',
-      okText: '削除',
-      okType: 'danger',
-      cancelText: 'キャンセル',
-      onOk: async () => {
-        await deleteModelDefinition(categoryId);
-        await loadDashboardData();
-      },
-    });
-  };
+  const handleDeleteModel = useCallback(
+    (categoryId) => {
+      Modal.confirm({
+        title: 'モデルを削除しますか？',
+        content: '異常検知結果もすべて削除されます。この操作は取り消せません。',
+        okText: '削除',
+        okType: 'danger',
+        cancelText: 'キャンセル',
+        onOk: async () => {
+          await deleteModelDefinition(categoryId);
+          await loadDashboardData();
+        },
+      });
+    },
+    [loadDashboardData],
+  );
 
-  const columns = [
-    {
-      title: 'カテゴリ',
-      dataIndex: 'categoryPath',
-      key: 'categoryPath',
-      render: (text, record) => (
-        <a onClick={() => onNavigateToPlot(record.categoryId)}>{text}</a>
-      ),
-    },
-    {
-      title: 'モデル状態',
-      dataIndex: 'modelStatus',
-      key: 'modelStatus',
-      render: (status) =>
-        status === 'defined' ? (
-          <Tag color="green">定義済み</Tag>
-        ) : (
-          <Tag color="default">未定義</Tag>
+  const columns = useMemo(
+    () => [
+      {
+        title: 'カテゴリ',
+        dataIndex: 'categoryPath',
+        key: 'categoryPath',
+        render: (text, record) => (
+          <a onClick={() => onNavigateToPlot(record.categoryId)}>{text}</a>
         ),
-      filters: [
-        { text: '定義済み', value: 'defined' },
-        { text: '未定義', value: 'undefined' },
-      ],
-      onFilter: (value, record) => record.modelStatus === value,
-    },
-    {
-      title: 'トレンド警告',
-      dataIndex: 'trend',
-      key: 'warning',
-      render: (trend) => {
-        if (!trend) return <Tag>未分析</Tag>;
-        return trend.is_warning ? (
-          <Tag color="red">警告</Tag>
-        ) : (
-          <Tag color="green">正常</Tag>
-        );
       },
-    },
-    {
-      title: '傾き (slope)',
-      dataIndex: 'trend',
-      key: 'slope',
-      render: (trend) => (trend ? trend.slope.toFixed(4) : '-'),
-      sorter: (a, b) => {
-        const sa = a.trend ? a.trend.slope : 0;
-        const sb = b.trend ? b.trend.slope : 0;
-        return sa - sb;
+      {
+        title: 'モデル状態',
+        dataIndex: 'modelStatus',
+        key: 'modelStatus',
+        render: (status) =>
+          status === 'defined' ? (
+            <Tag color="green">定義済み</Tag>
+          ) : (
+            <Tag color="default">未定義</Tag>
+          ),
+        filters: [
+          { text: '定義済み', value: 'defined' },
+          { text: '未定義', value: 'undefined' },
+        ],
+        onFilter: (value, record) => record.modelStatus === value,
       },
-    },
-    {
-      title: '操作',
-      key: 'actions',
-      render: (_, record) => (
-        <Space>
-          <Button
-            size="small"
-            onClick={() => onNavigateToPlot(record.categoryId)}
-            icon={<LineChartOutlined />}
-          >
-            プロット
-          </Button>
-          {record.modelStatus === 'defined' && (
+      {
+        title: 'トレンド警告',
+        dataIndex: 'trend',
+        key: 'warning',
+        render: (trend) => {
+          if (!trend) return <Tag>未分析</Tag>;
+          return trend.is_warning ? (
+            <Tag color="red">警告</Tag>
+          ) : (
+            <Tag color="green">正常</Tag>
+          );
+        },
+      },
+      {
+        title: '傾き (slope)',
+        dataIndex: 'trend',
+        key: 'slope',
+        render: (trend) => (trend ? trend.slope.toFixed(4) : '-'),
+        sorter: (a, b) => {
+          const sa = a.trend ? a.trend.slope : 0;
+          const sb = b.trend ? b.trend.slope : 0;
+          return sa - sb;
+        },
+      },
+      {
+        title: '操作',
+        key: 'actions',
+        render: (_, record) => (
+          <Space>
             <Button
               size="small"
-              danger
-              icon={<DeleteOutlined />}
-              onClick={() => handleDeleteModel(record.categoryId)}
+              onClick={() => onNavigateToPlot(record.categoryId)}
+              icon={<LineChartOutlined />}
             >
-              モデル削除
+              プロット
             </Button>
-          )}
-        </Space>
-      ),
-    },
-  ];
+            {record.modelStatus === 'defined' && (
+              <Button
+                size="small"
+                danger
+                icon={<DeleteOutlined />}
+                onClick={() => handleDeleteModel(record.categoryId)}
+              >
+                モデル削除
+              </Button>
+            )}
+          </Space>
+        ),
+      },
+    ],
+    [onNavigateToPlot, handleDeleteModel],
+  );
 
   return (
     <div>
@@ -159,18 +174,11 @@ function Dashboard({ categories, onNavigateToPlot }) {
           showIcon
           closable
           onClose={() => setError(null)}
-          style={{ marginBottom: 16 }}
+          style={STYLE_ALERT_MB}
         />
       )}
-      <div
-        style={{
-          marginBottom: 16,
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-        }}
-      >
-        <Title level={4} style={{ margin: 0 }}>
+      <div style={STYLE_HEADER_ROW}>
+        <Title level={4} style={STYLE_TITLE_INLINE}>
           監視ダッシュボード
         </Title>
         <Button
@@ -193,4 +201,4 @@ function Dashboard({ categories, onNavigateToPlot }) {
   );
 }
 
-export default Dashboard;
+export default React.memo(Dashboard);
