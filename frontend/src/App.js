@@ -4,6 +4,7 @@ import { DashboardOutlined, LineChartOutlined } from '@ant-design/icons';
 import CategoryTree from './components/CategoryTree';
 import PlotView from './components/PlotView';
 import Dashboard from './components/Dashboard';
+import { useResizable } from './hooks/useResizable';
 import { fetchCategories } from './services/api';
 import './App.css';
 
@@ -21,6 +22,7 @@ const STYLE_MENU_NAV = { marginLeft: 'auto', background: 'transparent' };
 const STYLE_PADDING_16 = { padding: '16px' };
 const STYLE_SPINNER = { display: 'block', marginTop: 24 };
 const STYLE_ALERT_MB = { marginBottom: 16 };
+const STYLE_SIDER_WRAPPER = { position: 'relative', display: 'flex', flexShrink: 0 };
 
 /**
  * アプリケーションシェル。
@@ -34,6 +36,11 @@ function App() {
   const [categories, setCategories] = useState([]);
   const [loadingCategories, setLoadingCategories] = useState(true);
   const [error, setError] = useState(null);
+  const { width: siderWidth, isDragging, handleMouseDown } = useResizable({
+    defaultWidth: 280,
+    minWidth: 200,
+    maxWidth: 500,
+  });
 
   // 初回マウント時にカテゴリツリーを取得
   useEffect(() => {
@@ -89,28 +96,36 @@ function App() {
       </Header>
       <Layout className="layout-body">
         {currentView === 'plot' && (
-          <Sider
-            collapsible
-            collapsed={collapsed}
-            onCollapse={setCollapsed}
-            width={280}
-            theme="light"
-            className="site-sider"
-          >
+          <div style={STYLE_SIDER_WRAPPER}>
+            <Sider
+              collapsible
+              collapsed={collapsed}
+              onCollapse={setCollapsed}
+              width={siderWidth}
+              theme="light"
+              className="site-sider"
+            >
+              {!collapsed && (
+                <div style={STYLE_PADDING_16}>
+                  <Text type="secondary">分類選択</Text>
+                  {loadingCategories ? (
+                    <Spin style={STYLE_SPINNER} />
+                  ) : (
+                    <CategoryTree
+                      categories={categories}
+                      onSelect={setSelectedCategoryId}
+                    />
+                  )}
+                </div>
+              )}
+            </Sider>
             {!collapsed && (
-              <div style={STYLE_PADDING_16}>
-                <Text type="secondary">分類選択</Text>
-                {loadingCategories ? (
-                  <Spin style={STYLE_SPINNER} />
-                ) : (
-                  <CategoryTree
-                    categories={categories}
-                    onSelect={setSelectedCategoryId}
-                  />
-                )}
-              </div>
+              <div
+                className={`resize-handle${isDragging ? ' resize-handle--active' : ''}`}
+                onMouseDown={handleMouseDown}
+              />
             )}
-          </Sider>
+          </div>
         )}
         <Layout className="layout-content">
           <Content className="site-content">
