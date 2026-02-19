@@ -287,19 +287,15 @@ async def put_model_definition(
     category_id: int,
     body: ModelDefinitionRequest,
     result_store: ResultStoreDep,
+    engine: EngineDep,
 ):
-    """モデル定義を保存する。
-
-    ベースライン変更があれば retrained フラグを返す。
-    """
+    """モデル定義を保存し、異常検知を実行する."""
     existing = result_store.get_model_definition(category_id)
-    retrained = False
-    if existing is not None:
-        retrained = (
-            existing.baseline_start != body.baseline_start
-            or existing.baseline_end != body.baseline_end
-            or sorted(existing.excluded_points) != sorted(body.excluded_points)
-        )
+    baseline_changed = existing is None or (
+        existing.baseline_start != body.baseline_start
+        or existing.baseline_end != body.baseline_end
+        or sorted(existing.excluded_points) != sorted(body.excluded_points)
+    )
 
     definition = ModelDefinition(
         category_id=category_id,
@@ -309,7 +305,8 @@ async def put_model_definition(
         excluded_points=body.excluded_points,
     )
     result_store.save_model_definition(definition)
-    return {"retrained": retrained}
+    engine.run(category_id)
+    return {"retrained": baseline_changed}
 
 
 @app.delete("/api/models/{category_id}")
