@@ -37,7 +37,7 @@ const client = axios.create({ baseURL: '/api' });
  */
 
 /**
- * @typedef {Object} ModelDefinition
+ * @typedef {Object} BaselineConfig
  * @property {string} baseline_start
  * @property {string} baseline_end
  * @property {number} sensitivity
@@ -84,9 +84,9 @@ export async function fetchResults(categoryId) {
 /**
  * GET /api/models/{category_id}
  * @param {number} categoryId
- * @returns {Promise<ModelDefinition>}
+ * @returns {Promise<BaselineConfig>}
  */
-export async function fetchModelDefinition(categoryId) {
+export async function fetchBaselineConfig(categoryId) {
   const { data } = await client.get(`/models/${categoryId}`);
   return data;
 }
@@ -94,15 +94,15 @@ export async function fetchModelDefinition(categoryId) {
 /**
  * PUT /api/models/{category_id}
  * @param {number} categoryId
- * @param {Object} definition
- * @param {string} definition.baseline_start
- * @param {string} definition.baseline_end
- * @param {number} definition.sensitivity
- * @param {string[]} [definition.excluded_points]
+ * @param {Object} config
+ * @param {string} config.baseline_start
+ * @param {string} config.baseline_end
+ * @param {number} config.sensitivity
+ * @param {string[]} [config.excluded_points]
  * @returns {Promise<{retrained: boolean}>}
  */
-export async function saveModelDefinition(categoryId, definition) {
-  const { data } = await client.put(`/models/${categoryId}`, definition);
+export async function saveBaselineConfig(categoryId, config) {
+  const { data } = await client.put(`/models/${categoryId}`, config);
   return data;
 }
 
@@ -111,7 +111,7 @@ export async function saveModelDefinition(categoryId, definition) {
  * @param {number} categoryId
  * @returns {Promise<{deleted: boolean}>}
  */
-export async function deleteModelDefinition(categoryId) {
+export async function deleteBaselineConfig(categoryId) {
   const { data } = await client.delete(`/models/${categoryId}`);
   return data;
 }
