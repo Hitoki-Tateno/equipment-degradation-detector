@@ -346,28 +346,20 @@ class TestAnalysisEngineAnomalyDetection:
             ),
         ]
         mock_data_store.get_records.return_value = records
-        mock_result_store.get_model_definition.return_value = (
-            ModelDefinition(
-                category_id=1,
-                baseline_start=datetime(2025, 1, 1),
-                baseline_end=datetime(2025, 3, 1),
-                sensitivity=0.5,
-                excluded_points=[],
-            )
+        mock_result_store.get_model_definition.return_value = ModelDefinition(
+            category_id=1,
+            baseline_start=datetime(2025, 1, 1),
+            baseline_end=datetime(2025, 3, 1),
+            sensitivity=0.5,
+            excluded_points=[],
         )
 
         engine.run(1)
 
-        mock_result_store.save_anomaly_results\
-            .assert_called_once()
-        saved = (
-            mock_result_store
-            .save_anomaly_results.call_args[0][0]
-        )
+        mock_result_store.save_anomaly_results.assert_called_once()
+        saved = mock_result_store.save_anomaly_results.call_args[0][0]
         assert len(saved) == 3
-        assert all(
-            isinstance(r, AnomalyResult) for r in saved
-        )
+        assert all(isinstance(r, AnomalyResult) for r in saved)
         assert all(r.category_id == 1 for r in saved)
 
     def test_excluded_points_removed(
@@ -393,22 +385,17 @@ class TestAnalysisEngineAnomalyDetection:
             ),
         ]
         mock_data_store.get_records.return_value = records
-        mock_result_store.get_model_definition.return_value = (
-            ModelDefinition(
-                category_id=1,
-                baseline_start=datetime(2025, 1, 1),
-                baseline_end=datetime(2025, 3, 1),
-                sensitivity=0.5,
-                excluded_points=[excluded_dt],
-            )
+        mock_result_store.get_model_definition.return_value = ModelDefinition(
+            category_id=1,
+            baseline_start=datetime(2025, 1, 1),
+            baseline_end=datetime(2025, 3, 1),
+            sensitivity=0.5,
+            excluded_points=[excluded_dt],
         )
 
         engine.run(1)
 
-        saved = (
-            mock_result_store
-            .save_anomaly_results.call_args[0][0]
-        )
+        saved = mock_result_store.save_anomaly_results.call_args[0][0]
         assert len(saved) == 3
 
     def test_no_anomaly_when_model_undefined(
@@ -423,13 +410,11 @@ class TestAnalysisEngineAnomalyDetection:
             ),
         ]
         mock_data_store.get_records.return_value = records
-        mock_result_store.get_model_definition\
-            .return_value = None
+        mock_result_store.get_model_definition.return_value = None
 
         engine.run(1)
 
-        mock_result_store.save_anomaly_results\
-            .assert_not_called()
+        mock_result_store.save_anomaly_results.assert_not_called()
 
     def test_anomaly_timestamps_match_records(
         self, engine, mock_data_store, mock_result_store
@@ -450,22 +435,17 @@ class TestAnalysisEngineAnomalyDetection:
             ),
         ]
         mock_data_store.get_records.return_value = records
-        mock_result_store.get_model_definition.return_value = (
-            ModelDefinition(
-                category_id=1,
-                baseline_start=dt1,
-                baseline_end=dt2,
-                sensitivity=0.5,
-                excluded_points=[],
-            )
+        mock_result_store.get_model_definition.return_value = ModelDefinition(
+            category_id=1,
+            baseline_start=dt1,
+            baseline_end=dt2,
+            sensitivity=0.5,
+            excluded_points=[],
         )
 
         engine.run(1)
 
-        saved = (
-            mock_result_store
-            .save_anomaly_results.call_args[0][0]
-        )
+        saved = mock_result_store.save_anomaly_results.call_args[0][0]
         timestamps = [r.recorded_at for r in saved]
         assert timestamps == [dt1, dt2]
 
@@ -491,22 +471,17 @@ class TestAnalysisEngineAnomalyDetection:
             ),
         ]
         mock_data_store.get_records.return_value = records
-        mock_result_store.get_model_definition.return_value = (
-            ModelDefinition(
-                category_id=1,
-                baseline_start=datetime(2025, 1, 1),
-                baseline_end=datetime(2025, 6, 30),
-                sensitivity=0.5,
-                excluded_points=[],
-            )
+        mock_result_store.get_model_definition.return_value = ModelDefinition(
+            category_id=1,
+            baseline_start=datetime(2025, 1, 1),
+            baseline_end=datetime(2025, 6, 30),
+            sensitivity=0.5,
+            excluded_points=[],
         )
 
         engine.run(1)
 
-        saved = (
-            mock_result_store
-            .save_anomaly_results.call_args[0][0]
-        )
+        saved = mock_result_store.save_anomaly_results.call_args[0][0]
         assert len(saved) == 3
 
     def test_empty_baseline_skips_anomaly(
@@ -521,20 +496,17 @@ class TestAnalysisEngineAnomalyDetection:
             ),
         ]
         mock_data_store.get_records.return_value = records
-        mock_result_store.get_model_definition.return_value = (
-            ModelDefinition(
-                category_id=1,
-                baseline_start=datetime(2025, 1, 1),
-                baseline_end=datetime(2025, 3, 1),
-                sensitivity=0.5,
-                excluded_points=[],
-            )
+        mock_result_store.get_model_definition.return_value = ModelDefinition(
+            category_id=1,
+            baseline_start=datetime(2025, 1, 1),
+            baseline_end=datetime(2025, 3, 1),
+            sensitivity=0.5,
+            excluded_points=[],
         )
 
         engine.run(1)
 
-        mock_result_store.save_anomaly_results\
-            .assert_not_called()
+        mock_result_store.save_anomaly_results.assert_not_called()
 
 
 # --- offset-aware/naive 混在テスト (issue #55) ---
