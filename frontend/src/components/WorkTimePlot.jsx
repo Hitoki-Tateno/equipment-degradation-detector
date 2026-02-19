@@ -1,5 +1,8 @@
 import React, { useMemo, useCallback } from 'react';
-import Plot from 'react-plotly.js';
+import Plotly from 'plotly.js-gl2d-dist';
+import createPlotlyComponent from 'react-plotly.js/factory';
+
+const Plot = createPlotlyComponent(Plotly);
 
 // 感度値から異常スコアの閾値を算出（スコアが閾値未満で異常と判定）
 function computeThreshold(sensitivity, anomalies) {
@@ -73,7 +76,7 @@ function WorkTimePlot({
     const scatterTrace = {
       x,
       y,
-      type: 'scatter',
+      type: 'scattergl',
       mode: 'markers',
       marker: { color: markerColors, size: 8, symbol: markerSymbols },
       name: '作業時間',
@@ -90,7 +93,7 @@ function WorkTimePlot({
           trend.intercept + trend.slope * 1,
           trend.intercept + trend.slope * n,
         ],
-        type: 'scatter',
+        type: 'scattergl',
         mode: 'lines',
         line: { color: 'red', dash: 'dash' },
         name: 'トレンド',

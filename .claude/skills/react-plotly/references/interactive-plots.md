@@ -6,7 +6,10 @@ WorkTimePlot.jsx が Plotly の描画を担当。全データは `useMemo` で�
 
 ```jsx
 import React, { useMemo, useCallback } from 'react';
-import Plot from 'react-plotly.js';
+import Plotly from 'plotly.js-gl2d-dist';
+import createPlotlyComponent from 'react-plotly.js/factory';
+
+const Plot = createPlotlyComponent(Plotly);
 
 const PLOT_STYLE = { width: '100%', height: '400px' };
 
@@ -165,7 +168,7 @@ const markerSymbols = useMemo(() => {
 ```jsx
 const traces = useMemo(() => {
   const t = [{
-    x, y, type: 'scatter', mode: 'markers',
+    x, y, type: 'scattergl', mode: 'markers',
     marker: { color: markerColors, size: 8, symbol: markerSymbols },
     name: '作業時間',
   }];
@@ -173,7 +176,7 @@ const traces = useMemo(() => {
     t.push({
       x: [x[0], x[n - 1]],
       y: [trend.intercept + trend.slope * 1, trend.intercept + trend.slope * n],
-      type: 'scatter', mode: 'lines',
+      type: 'scattergl', mode: 'lines',
       line: { color: 'red', dash: 'dash' },
       name: 'トレンド',
     });
