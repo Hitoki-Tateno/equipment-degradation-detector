@@ -3,15 +3,15 @@ import { Layout, Typography, Empty, Spin, Alert, Menu } from 'antd';
 import { DashboardOutlined, LineChartOutlined } from '@ant-design/icons';
 import CategoryTree from './components/CategoryTree';
 import WorkTimePlot from './components/WorkTimePlot';
-import ModelControls from './components/ModelControls';
+import BaselineControls from './components/BaselineControls';
 import Dashboard from './components/Dashboard';
 import {
   fetchCategories,
   fetchRecords,
   fetchResults,
-  fetchModelDefinition,
-  saveModelDefinition,
-  deleteModelDefinition,
+  fetchBaselineConfig,
+  saveBaselineConfig,
+  deleteBaselineConfig,
 } from './services/api';
 import './App.css';
 
@@ -42,11 +42,11 @@ function App() {
   const [trend, setTrend] = useState(null);
   const [anomalies, setAnomalies] = useState([]);
 
-  const [modelStatus, setModelStatus] = useState('undefined');
+  const [baselineStatus, setBaselineStatus] = useState('unconfigured');
   const [baselineRange, setBaselineRange] = useState(null);
   const [excludedIndices, setExcludedIndices] = useState([]);
   const [sensitivity, setSensitivity] = useState(0.5);
-  const [savingModel, setSavingModel] = useState(false);
+  const [savingBaseline, setSavingBaseline] = useState(false);
 
   const [loadingCategories, setLoadingCategories] = useState(true);
   const [loadingRecords, setLoadingRecords] = useState(false);
@@ -76,7 +76,7 @@ function App() {
       setRecords([]);
       setTrend(null);
       setAnomalies([]);
-      setModelStatus('undefined');
+      setBaselineStatus('unconfigured');
       setBaselineRange(null);
       setExcludedIndices([]);
       setSensitivity(0.5);
@@ -94,18 +94,18 @@ function App() {
       setAnomalies(results.anomalies || []);
 
       try {
-        const modelDef = await fetchModelDefinition(categoryId);
-        setModelStatus('defined');
-        setBaselineRange({ start: modelDef.baseline_start, end: modelDef.baseline_end });
-        setSensitivity(modelDef.sensitivity);
-        const excludedDates = new Set(modelDef.excluded_points.map((d) => d));
+        const baselineDef = await fetchBaselineConfig(categoryId);
+        setBaselineStatus('configured');
+        setBaselineRange({ start: baselineDef.baseline_start, end: baselineDef.baseline_end });
+        setSensitivity(baselineDef.sensitivity);
+        const excludedDates = new Set(baselineDef.excluded_points.map((d) => d));
         const indices = recs
           .map((r, i) => (excludedDates.has(r.recorded_at) ? i : -1))
           .filter((i) => i >= 0);
         setExcludedIndices(indices);
       } catch (err) {
         if (err.response && err.response.status === 404) {
-          setModelStatus('undefined');
+          setBaselineStatus('unconfigured');
           setBaselineRange(null);
           setExcludedIndices([]);
           setSensitivity(0.5);
@@ -120,33 +120,33 @@ function App() {
     }
   }, []);
 
-  const handleSaveModel = useCallback(async () => {
+  const handleSaveBaseline = useCallback(async () => {
     if (!selectedCategoryId || !baselineRange) return;
-    setSavingModel(true);
+    setSavingBaseline(true);
     try {
       const excludedPoints = excludedIndices.map((i) => records[i].recorded_at);
-      await saveModelDefinition(selectedCategoryId, {
+      await saveBaselineConfig(selectedCategoryId, {
         baseline_start: baselineRange.start,
         baseline_end: baselineRange.end,
         sensitivity,
         excluded_points: excludedPoints,
       });
-      setModelStatus('defined');
+      setBaselineStatus('configured');
       const results = await fetchResults(selectedCategoryId);
       setTrend(results.trend);
       setAnomalies(results.anomalies || []);
     } catch (err) {
-      setError(`モデル保存エラー: ${err.message}`);
+      setError(`設定保存エラー: ${err.message}`);
     } finally {
-      setSavingModel(false);
+      setSavingBaseline(false);
     }
   }, [selectedCategoryId, baselineRange, excludedIndices, sensitivity, records]);
 
-  const handleDeleteModel = useCallback(async () => {
+  const handleDeleteBaseline = useCallback(async () => {
     if (!selectedCategoryId) return;
     try {
-      await deleteModelDefinition(selectedCategoryId);
-      setModelStatus('undefined');
+      await deleteBaselineConfig(selectedCategoryId);
+      setBaselineStatus('unconfigured');
       setBaselineRange(null);
       setExcludedIndices([]);
       setSensitivity(0.5);
@@ -155,7 +155,7 @@ function App() {
       setTrend(results.trend);
       setAnomalies(results.anomalies || []);
     } catch (err) {
-      setError(`モデル削除エラー: ${err.message}`);
+      setError(`設定リセットエラー: ${err.message}`);
     }
   }, [selectedCategoryId]);
 
@@ -259,18 +259,18 @@ function App() {
                           sensitivity={sensitivity}
                           baselineRange={baselineRange}
                           excludedIndices={excludedIndices}
-                          modelStatus={modelStatus}
+                          baselineStatus={baselineStatus}
                           onBaselineSelect={setBaselineRange}
                           onToggleExclude={toggleExclude}
                         />
-                        <ModelControls
-                          modelStatus={modelStatus}
+                        <BaselineControls
+                          baselineStatus={baselineStatus}
                           baselineRange={baselineRange}
                           sensitivity={sensitivity}
                           onSensitivityChange={setSensitivity}
-                          onSave={handleSaveModel}
-                          onDelete={handleDeleteModel}
-                          savingModel={savingModel}
+                          onSave={handleSaveBaseline}
+                          onDelete={handleDeleteBaseline}
+                          savingBaseline={savingBaseline}
                           hasAnomalies={anomalies.length > 0}
                         />
                       </>

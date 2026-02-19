@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Table, Tag, Button, Space, Modal, Typography, Alert, message } from 'antd';
 import { DeleteOutlined, ThunderboltOutlined, LineChartOutlined } from '@ant-design/icons';
-import { fetchResults, fetchModelDefinition, deleteModelDefinition, triggerAnalysis } from '../services/api';
+import { fetchResults, fetchBaselineConfig, deleteBaselineConfig, triggerAnalysis } from '../services/api';
 import { flattenLeafCategories } from '../utils/categoryUtils';
 
 const { Title } = Typography;
@@ -29,9 +29,9 @@ function Dashboard({ categories, onNavigateToPlot }) {
       const leaves = flattenLeafCategories(categories);
       const data = await Promise.all(
         leaves.map(async (leaf) => {
-          const [results, modelDef] = await Promise.allSettled([
+          const [results, baselineDef] = await Promise.allSettled([
             fetchResults(leaf.id),
-            fetchModelDefinition(leaf.id),
+            fetchBaselineConfig(leaf.id),
           ]);
           return {
             key: leaf.id,
@@ -40,7 +40,7 @@ function Dashboard({ categories, onNavigateToPlot }) {
             trend: results.status === 'fulfilled' ? results.value.trend : null,
             anomalyCount:
               results.status === 'fulfilled' ? (results.value.anomalies || []).length : 0,
-            modelStatus: modelDef.status === 'fulfilled' ? 'defined' : 'undefined',
+            baselineStatus: baselineDef.status === 'fulfilled' ? 'configured' : 'unconfigured',
           };
         }),
       );
@@ -69,16 +69,16 @@ function Dashboard({ categories, onNavigateToPlot }) {
     }
   };
 
-  const handleDeleteModel = useCallback(
+  const handleDeleteBaseline = useCallback(
     (categoryId) => {
       Modal.confirm({
-        title: 'モデルを削除しますか？',
+        title: '設定をリセットしますか？',
         content: '異常検知結果もすべて削除されます。この操作は取り消せません。',
-        okText: '削除',
+        okText: 'リセット',
         okType: 'danger',
         cancelText: 'キャンセル',
         onOk: async () => {
-          await deleteModelDefinition(categoryId);
+          await deleteBaselineConfig(categoryId);
           await loadDashboardData();
         },
       });
@@ -97,20 +97,20 @@ function Dashboard({ categories, onNavigateToPlot }) {
         ),
       },
       {
-        title: 'モデル状態',
-        dataIndex: 'modelStatus',
-        key: 'modelStatus',
+        title: 'ベースライン設定',
+        dataIndex: 'baselineStatus',
+        key: 'baselineStatus',
         render: (status) =>
-          status === 'defined' ? (
-            <Tag color="green">定義済み</Tag>
+          status === 'configured' ? (
+            <Tag color="green">設定済み</Tag>
           ) : (
-            <Tag color="default">未定義</Tag>
+            <Tag color="default">未設定</Tag>
           ),
         filters: [
-          { text: '定義済み', value: 'defined' },
-          { text: '未定義', value: 'undefined' },
+          { text: '設定済み', value: 'configured' },
+          { text: '未設定', value: 'unconfigured' },
         ],
-        onFilter: (value, record) => record.modelStatus === value,
+        onFilter: (value, record) => record.baselineStatus === value,
       },
       {
         title: 'トレンド警告',
@@ -148,21 +148,21 @@ function Dashboard({ categories, onNavigateToPlot }) {
             >
               プロット
             </Button>
-            {record.modelStatus === 'defined' && (
+            {record.baselineStatus === 'configured' && (
               <Button
                 size="small"
                 danger
                 icon={<DeleteOutlined />}
-                onClick={() => handleDeleteModel(record.categoryId)}
+                onClick={() => handleDeleteBaseline(record.categoryId)}
               >
-                モデル削除
+                設定をリセット
               </Button>
             )}
           </Space>
         ),
       },
     ],
-    [onNavigateToPlot, handleDeleteModel],
+    [onNavigateToPlot, handleDeleteBaseline],
   );
 
   return (
