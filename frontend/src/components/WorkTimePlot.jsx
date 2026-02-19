@@ -27,8 +27,10 @@ function WorkTimePlot({
   baselineRange,
   excludedIndices,
   interactionMode,
+  axisRange,
   onBaselineSelect,
   onToggleExclude,
+  onRelayout,
 }) {
   const x = useMemo(() => records.map((r) => r.recorded_at), [records]);
   const y = useMemo(() => records.map((r) => r.work_time), [records]);
@@ -153,13 +155,24 @@ function WorkTimePlot({
     () => ({
       dragmode: interactionMode === 'select' ? 'select' : 'zoom',
       selections: interactionMode === 'select' ? undefined : [],
-      xaxis: { title: '記録日時', type: 'date' },
-      yaxis: { title: '作業時間 t (秒)' },
+      xaxis: {
+        title: '記録日時',
+        type: 'date',
+        ...(axisRange?.x
+          ? { range: axisRange.x, autorange: false }
+          : {}),
+      },
+      yaxis: {
+        title: '作業時間 t (秒)',
+        ...(axisRange?.y
+          ? { range: axisRange.y, autorange: false }
+          : {}),
+      },
       margin: { t: 20, r: 20 },
       autosize: true,
       shapes,
     }),
-    [interactionMode, shapes],
+    [interactionMode, shapes, axisRange],
   );
 
   return (
@@ -168,6 +181,7 @@ function WorkTimePlot({
       layout={layout}
       onSelected={handleSelected}
       onClick={handleClick}
+      onRelayout={onRelayout}
       useResizeHandler
       style={PLOT_STYLE}
     />
