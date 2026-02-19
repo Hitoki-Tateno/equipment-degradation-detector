@@ -17,14 +17,26 @@
   align-items: center;
 }
 
+.layout-body {
+  overflow: hidden;
+}
+
 .site-sider {
   background: #fff;
   border-right: 1px solid #f0f0f0;
+  overflow-y: auto;
+  height: calc(100vh - 64px);
 }
 
 .site-sider .ant-layout-sider-trigger {
   background: #fafafa;
   color: #001529;
+}
+
+.layout-content {
+  overflow-y: auto;
+  height: calc(100vh - 64px);
+  padding: 24px;
 }
 
 .site-content {
