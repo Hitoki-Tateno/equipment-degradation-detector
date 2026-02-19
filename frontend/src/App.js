@@ -20,7 +20,6 @@ const STYLE_TITLE_HEADER = { color: '#fff', margin: 0, display: 'inline' };
 const STYLE_MENU_NAV = { marginLeft: 'auto', background: 'transparent' };
 const STYLE_PADDING_16 = { padding: '16px' };
 const STYLE_SPINNER = { display: 'block', marginTop: 24 };
-const STYLE_CONTENT_PADDING = { padding: '24px' };
 const STYLE_ALERT_MB = { marginBottom: 16 };
 
 /**
@@ -88,7 +87,7 @@ function App() {
           style={STYLE_MENU_NAV}
         />
       </Header>
-      <Layout>
+      <Layout className="layout-body">
         {currentView === 'plot' && (
           <Sider
             collapsible
@@ -113,7 +112,7 @@ function App() {
             )}
           </Sider>
         )}
-        <Layout style={STYLE_CONTENT_PADDING}>
+        <Layout className="layout-content">
           <Content className="site-content">
             {error && (
               <Alert
