@@ -11,11 +11,18 @@ const STYLE_SPINNER = { display: 'block', marginTop: 24 };
 const STYLE_ALERT_MB = { marginBottom: 16 };
 const STYLE_SEGMENTED = { marginBottom: 12 };
 
+// インタラクションモード切替トグルの選択肢
+// select: ベースライン範囲選択 + 除外点クリック
+// operate: ズーム・パン操作
 const MODE_OPTIONS = [
   { label: '選択モード', value: 'select', icon: <SelectOutlined /> },
   { label: '操作モード', value: 'operate', icon: <ZoomInOutlined /> },
 ];
 
+/**
+ * プロットビュー: モード切替トグル + 散布図 + ベースライン操作パネル。
+ * ベースライン関連のロジックは useBaselineManager hook に委譲。
+ */
 function PlotView({ categoryId }) {
   const {
     records, trend, anomalies,

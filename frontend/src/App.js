@@ -23,14 +23,20 @@ const STYLE_SPINNER = { display: 'block', marginTop: 24 };
 const STYLE_CONTENT_PADDING = { padding: '24px' };
 const STYLE_ALERT_MB = { marginBottom: 16 };
 
+/**
+ * アプリケーションシェル。
+ * レイアウト（Header / Sider / Content）とビュー切替を管理する。
+ * プロットビューの状態管理は PlotView + useBaselineManager に委譲。
+ */
 function App() {
-  const [currentView, setCurrentView] = useState('dashboard');
+  const [currentView, setCurrentView] = useState('dashboard'); // 'dashboard' | 'plot'
   const [collapsed, setCollapsed] = useState(false);
   const [selectedCategoryId, setSelectedCategoryId] = useState(null);
   const [categories, setCategories] = useState([]);
   const [loadingCategories, setLoadingCategories] = useState(true);
   const [error, setError] = useState(null);
 
+  // 初回マウント時にカテゴリツリーを取得
   useEffect(() => {
     let cancelled = false;
     setLoadingCategories(true);
@@ -47,6 +53,7 @@ function App() {
     return () => { cancelled = true; };
   }, []);
 
+  // ダッシュボードからプロットビューへ遷移
   const handleNavigateToPlot = useCallback((categoryId) => {
     setCurrentView('plot');
     setSelectedCategoryId(categoryId);
