@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React from 'react';
 import { Typography, Spin, Empty, Segmented, Alert } from 'antd';
 import { SelectOutlined, ZoomInOutlined } from '@ant-design/icons';
 import WorkTimePlot from './WorkTimePlot';
@@ -22,6 +22,7 @@ const MODE_OPTIONS = [
 /**
  * プロットビュー: モード切替トグル + 散布図 + ベースライン操作パネル。
  * ベースライン関連のロジックは useBaselineManager hook に委譲。
+ * ズーム/パン状態は Plotly の uirevision に委譲（React 側で管理しない）。
  */
 function PlotView({ categoryId }) {
   const {
@@ -32,33 +33,6 @@ function PlotView({ categoryId }) {
     loadingRecords, error, clearError,
     saveBaseline, deleteBaseline, toggleExclude,
   } = useBaselineManager(categoryId);
-
-  // ズーム状態を保持（モード切替時にリセットしない）
-  const [axisRange, setAxisRange] = useState(null);
-
-  // カテゴリ切替時にズーム状態をリセット
-  useEffect(() => {
-    setAxisRange(null);
-  }, [categoryId]);
-
-  // Plotly の relayout イベントでズーム/パン状態をキャプチャ
-  const handleRelayout = useCallback((update) => {
-    if (update['xaxis.range[0]'] && update['xaxis.range[1]']) {
-      setAxisRange((prev) => ({
-        ...prev,
-        x: [update['xaxis.range[0]'], update['xaxis.range[1]']],
-      }));
-    }
-    if (update['yaxis.range[0]'] && update['yaxis.range[1]']) {
-      setAxisRange((prev) => ({
-        ...prev,
-        y: [update['yaxis.range[0]'], update['yaxis.range[1]']],
-      }));
-    }
-    if (update['xaxis.autorange'] || update['yaxis.autorange']) {
-      setAxisRange(null);
-    }
-  }, []);
 
   if (!categoryId) {
     return <Empty description="左のツリーから分類を選択してください" />;
@@ -95,10 +69,9 @@ function PlotView({ categoryId }) {
             baselineRange={baselineRange}
             excludedIndices={excludedIndices}
             interactionMode={interactionMode}
-            axisRange={axisRange}
+            categoryId={categoryId}
             onBaselineSelect={setBaselineRange}
             onToggleExclude={toggleExclude}
-            onRelayout={handleRelayout}
           />
           <BaselineControls
             baselineStatus={baselineStatus}
