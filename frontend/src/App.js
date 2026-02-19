@@ -1,6 +1,11 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Layout, Typography, Empty, Spin, Alert, Menu } from 'antd';
-import { DashboardOutlined, LineChartOutlined } from '@ant-design/icons';
+import { Layout, Typography, Empty, Spin, Alert, Menu, Segmented } from 'antd';
+import {
+  DashboardOutlined,
+  LineChartOutlined,
+  SelectOutlined,
+  ZoomInOutlined,
+} from '@ant-design/icons';
 import CategoryTree from './components/CategoryTree';
 import WorkTimePlot from './components/WorkTimePlot';
 import BaselineControls from './components/BaselineControls';
@@ -47,10 +52,18 @@ function App() {
   const [excludedIndices, setExcludedIndices] = useState([]);
   const [sensitivity, setSensitivity] = useState(0.5);
   const [savingBaseline, setSavingBaseline] = useState(false);
+  const [interactionMode, setInteractionMode] = useState('select');
 
   const [loadingCategories, setLoadingCategories] = useState(true);
   const [loadingRecords, setLoadingRecords] = useState(false);
   const [error, setError] = useState(null);
+
+  // baselineStatus変更時にデフォルトモードを設定
+  useEffect(() => {
+    setInteractionMode(
+      baselineStatus === 'configured' ? 'operate' : 'select',
+    );
+  }, [baselineStatus]);
 
   // 初回マウント時にカテゴリツリーを取得
   useEffect(() => {
@@ -252,6 +265,23 @@ function App() {
                       <Spin style={STYLE_SPINNER} />
                     ) : records.length > 0 ? (
                       <>
+                        <Segmented
+                          value={interactionMode}
+                          onChange={setInteractionMode}
+                          options={[
+                            {
+                              label: '選択モード',
+                              value: 'select',
+                              icon: <SelectOutlined />,
+                            },
+                            {
+                              label: '操作モード',
+                              value: 'operate',
+                              icon: <ZoomInOutlined />,
+                            },
+                          ]}
+                          style={{ marginBottom: 12 }}
+                        />
                         <WorkTimePlot
                           records={records}
                           trend={trend}
@@ -259,7 +289,7 @@ function App() {
                           sensitivity={sensitivity}
                           baselineRange={baselineRange}
                           excludedIndices={excludedIndices}
-                          baselineStatus={baselineStatus}
+                          interactionMode={interactionMode}
                           onBaselineSelect={setBaselineRange}
                           onToggleExclude={toggleExclude}
                         />

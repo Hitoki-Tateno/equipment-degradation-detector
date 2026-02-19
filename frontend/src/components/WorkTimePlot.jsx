@@ -18,7 +18,7 @@ function WorkTimePlot({
   sensitivity,
   baselineRange,
   excludedIndices,
-  baselineStatus,
+  interactionMode,
   onBaselineSelect,
   onToggleExclude,
 }) {
@@ -106,7 +106,7 @@ function WorkTimePlot({
 
   const handleSelected = useCallback(
     (event) => {
-      if (baselineStatus === 'configured') return;
+      if (interactionMode !== 'select') return;
       if (event && event.range && event.range.x && onBaselineSelect) {
         onBaselineSelect({
           start: event.range.x[0],
@@ -114,12 +114,12 @@ function WorkTimePlot({
         });
       }
     },
-    [baselineStatus, onBaselineSelect],
+    [interactionMode, onBaselineSelect],
   );
 
   const handleClick = useCallback(
     (event) => {
-      if (baselineStatus === 'configured') return;
+      if (interactionMode !== 'select') return;
       if (
         event &&
         event.points &&
@@ -129,19 +129,19 @@ function WorkTimePlot({
         onToggleExclude(event.points[0].pointIndex);
       }
     },
-    [baselineStatus, onToggleExclude],
+    [interactionMode, onToggleExclude],
   );
 
   const layout = useMemo(
     () => ({
-      dragmode: baselineStatus === 'configured' ? 'zoom' : 'select',
+      dragmode: interactionMode === 'select' ? 'select' : 'zoom',
       xaxis: { title: '記録日時', type: 'date' },
       yaxis: { title: '作業時間 t (秒)' },
       margin: { t: 20, r: 20 },
       autosize: true,
       shapes,
     }),
-    [baselineStatus, shapes],
+    [interactionMode, shapes],
   );
 
   return (
