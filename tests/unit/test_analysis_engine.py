@@ -587,3 +587,39 @@ class TestAnalysisEngineDatetimeMix:
         mock_result_store.save_anomaly_results.assert_called_once()
         saved = mock_result_store.save_anomaly_results.call_args[0][0]
         assert len(saved) == 3
+
+    def test_aware_records_with_naive_model(
+        self, engine, mock_data_store, mock_result_store
+    ):
+        """offset-aware records + offset-naive ModelDef."""
+        records = [
+            WorkRecord(
+                category_id=1,
+                work_time=10.0,
+                recorded_at=datetime(2025, 1, 1, tzinfo=UTC),
+            ),
+            WorkRecord(
+                category_id=1,
+                work_time=10.5,
+                recorded_at=datetime(2025, 2, 1, tzinfo=UTC),
+            ),
+            WorkRecord(
+                category_id=1,
+                work_time=10.2,
+                recorded_at=datetime(2025, 3, 1, tzinfo=UTC),
+            ),
+        ]
+        mock_data_store.get_records.return_value = records
+        mock_result_store.get_model_definition.return_value = ModelDefinition(
+            category_id=1,
+            baseline_start=datetime(2025, 1, 1),
+            baseline_end=datetime(2025, 3, 1),
+            sensitivity=0.5,
+            excluded_points=[],
+        )
+
+        engine.run(1)
+
+        mock_result_store.save_anomaly_results.assert_called_once()
+        saved = mock_result_store.save_anomaly_results.call_args[0][0]
+        assert len(saved) == 3

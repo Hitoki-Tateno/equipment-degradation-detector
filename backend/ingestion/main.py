@@ -9,7 +9,7 @@ from typing import Annotated
 
 import pandas as pd
 from fastapi import Depends, FastAPI, HTTPException, UploadFile
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from backend.analysis.engine import AnalysisEngine
 from backend.dependencies import (
@@ -46,6 +46,13 @@ class RecordItem(BaseModel):
     category_path: list[str]
     work_time: float
     recorded_at: datetime
+
+    @field_validator("recorded_at", mode="after")
+    @classmethod
+    def strip_tz(cls, v: datetime) -> datetime:
+        if v.tzinfo is not None:
+            return v.replace(tzinfo=None)
+        return v
 
 
 class RecordsBatchRequest(BaseModel):
@@ -93,6 +100,21 @@ class ModelDefinitionRequest(BaseModel):
     baseline_end: datetime
     sensitivity: float
     excluded_points: list[datetime] = []
+
+    @field_validator("baseline_start", "baseline_end", mode="after")
+    @classmethod
+    def strip_tz(cls, v: datetime) -> datetime:
+        if v.tzinfo is not None:
+            return v.replace(tzinfo=None)
+        return v
+
+    @field_validator("excluded_points", mode="after")
+    @classmethod
+    def strip_tz_list(cls, v: list[datetime]) -> list[datetime]:
+        return [
+            dt.replace(tzinfo=None) if dt.tzinfo is not None else dt
+            for dt in v
+        ]
 
 
 class ModelDefinitionResponse(BaseModel):
@@ -170,7 +192,10 @@ async def post_records_csv(
             detail="work_time and recorded_at columns are required",
         )
 
-    df["recorded_at"] = pd.to_datetime(df["recorded_at"])
+    ts = pd.to_datetime(df["recorded_at"])
+    if ts.dt.tz is not None:
+        ts = ts.dt.tz_localize(None)
+    df["recorded_at"] = ts
     category_columns = [
         c for c in df.columns if c not in ("work_time", "recorded_at")
     ]
