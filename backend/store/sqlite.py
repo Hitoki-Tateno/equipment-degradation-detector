@@ -30,9 +30,13 @@ CREATE INDEX IF NOT EXISTS idx_work_records_category_time
 """
 
 # datetime adapter/converter をモジュールレベルで一度だけ登録
-sqlite3.register_adapter(datetime, lambda dt: dt.isoformat())
+# offset-naive に統一: TZ付きdatetimeが入っても壁時計時刻を保持しTZを除去
+sqlite3.register_adapter(
+    datetime, lambda dt: dt.replace(tzinfo=None).isoformat()
+)
 sqlite3.register_converter(
-    "TIMESTAMP", lambda b: datetime.fromisoformat(b.decode())
+    "TIMESTAMP",
+    lambda b: datetime.fromisoformat(b.decode()).replace(tzinfo=None),
 )
 
 

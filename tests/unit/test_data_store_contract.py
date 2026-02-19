@@ -9,7 +9,7 @@
   3. 全テストがパスすることを確認
 """
 
-from datetime import datetime
+from datetime import UTC, datetime
 
 import pytest
 
@@ -163,3 +163,27 @@ class TestCategoryTree:
         process_a = next((n for n in tree if n.name == "プロセスA"), None)
         assert process_a is not None
         assert len(process_a.children) == 2
+
+
+class TestDatetimeNormalization:
+    """offset-aware datetime がストア経由で offset-naive に正規化される。"""
+
+    def test_aware_datetime_stored_and_retrieved_as_naive(
+        self, data_store: DataStoreInterface
+    ):
+        """offset-aware datetime を保存 → 取得時に offset-naive になる。"""
+        category_id = data_store.ensure_category_path(["TZ", "Test"])
+        aware_dt = datetime(2025, 1, 1, tzinfo=UTC)
+        records = [
+            WorkRecord(
+                category_id=category_id,
+                work_time=10.0,
+                recorded_at=aware_dt,
+            ),
+        ]
+        data_store.upsert_records(records)
+
+        result = data_store.get_records(category_id)
+        assert len(result) == 1
+        assert result[0].recorded_at.tzinfo is None
+        assert result[0].recorded_at == datetime(2025, 1, 1)

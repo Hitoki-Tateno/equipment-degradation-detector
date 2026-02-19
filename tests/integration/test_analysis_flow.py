@@ -360,3 +360,87 @@ class TestModelCreationTriggersAnomaly:
 
         results = client.get(f"/api/results/{leaf_id}")
         assert len(results.json()["anomalies"]) == 3
+
+
+class TestTimezoneAwareDatetimes:
+    """offset-aware datetime の入力が正しく処理される。"""
+
+    def test_aware_records_and_model_no_500(self, client):
+        """TZ付きレコード + TZ付きモデル定義 → 500エラーにならない。"""
+        client.post(
+            "/api/records",
+            json={
+                "records": [
+                    {
+                        "category_path": ["TZ", "A"],
+                        "work_time": 10.0,
+                        "recorded_at": "2025-01-01T00:00:00+09:00",
+                    },
+                    {
+                        "category_path": ["TZ", "A"],
+                        "work_time": 10.5,
+                        "recorded_at": "2025-02-01T00:00:00+09:00",
+                    },
+                    {
+                        "category_path": ["TZ", "A"],
+                        "work_time": 10.2,
+                        "recorded_at": "2025-03-01T00:00:00+09:00",
+                    },
+                ]
+            },
+        )
+        tree = client.get("/api/categories")
+        leaf_id = tree.json()["categories"][0]["children"][0]["id"]
+
+        resp = client.put(
+            f"/api/models/{leaf_id}",
+            json={
+                "baseline_start": "2025-01-01T00:00:00+09:00",
+                "baseline_end": "2025-03-31T00:00:00+09:00",
+                "sensitivity": 0.5,
+                "excluded_points": [],
+            },
+        )
+        assert resp.status_code == 200
+
+        results = client.get(f"/api/results/{leaf_id}")
+        assert results.status_code == 200
+        data = results.json()
+        assert len(data["anomalies"]) == 3
+
+    def test_mixed_aware_naive_no_error(self, client):
+        """naive レコード + aware モデル定義 → エラーにならない。"""
+        client.post(
+            "/api/records",
+            json={
+                "records": [
+                    {
+                        "category_path": ["TZ", "B"],
+                        "work_time": 10.0,
+                        "recorded_at": "2025-01-01T00:00:00",
+                    },
+                    {
+                        "category_path": ["TZ", "B"],
+                        "work_time": 10.5,
+                        "recorded_at": "2025-02-01T00:00:00",
+                    },
+                ]
+            },
+        )
+        tree = client.get("/api/categories")
+        leaf_id = tree.json()["categories"][0]["children"][0]["id"]
+
+        resp = client.put(
+            f"/api/models/{leaf_id}",
+            json={
+                "baseline_start": "2025-01-01T00:00:00Z",
+                "baseline_end": "2025-12-31T00:00:00Z",
+                "sensitivity": 0.5,
+                "excluded_points": ["2025-02-01T00:00:00Z"],
+            },
+        )
+        assert resp.status_code == 200
+
+        results = client.get(f"/api/results/{leaf_id}")
+        assert results.status_code == 200
+        assert len(results.json()["anomalies"]) == 2

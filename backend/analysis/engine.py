@@ -68,13 +68,17 @@ class AnalysisEngine:
             bl_start = model_def.baseline_start.replace(tzinfo=None)
             bl_end = model_def.baseline_end.replace(tzinfo=None)
             baseline_records = [
-                r for r in records if bl_start <= r.recorded_at <= bl_end
+                r
+                for r in records
+                if bl_start <= r.recorded_at.replace(tzinfo=None) <= bl_end
             ]
             excluded = {
                 dt.replace(tzinfo=None) for dt in model_def.excluded_points
             }
             baseline_records = [
-                r for r in baseline_records if r.recorded_at not in excluded
+                r
+                for r in baseline_records
+                if r.recorded_at.replace(tzinfo=None) not in excluded
             ]
             if not baseline_records:
                 return

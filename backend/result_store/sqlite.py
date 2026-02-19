@@ -41,9 +41,13 @@ CREATE TABLE IF NOT EXISTS model_definitions (
 );
 """
 
-sqlite3.register_adapter(datetime, lambda dt: dt.isoformat())
+# offset-naive に統一: TZ付きdatetimeが入っても壁時計時刻を保持しTZを除去
+sqlite3.register_adapter(
+    datetime, lambda dt: dt.replace(tzinfo=None).isoformat()
+)
 sqlite3.register_converter(
-    "TIMESTAMP", lambda b: datetime.fromisoformat(b.decode())
+    "TIMESTAMP",
+    lambda b: datetime.fromisoformat(b.decode()).replace(tzinfo=None),
 )
 
 
@@ -126,7 +130,10 @@ class SqliteResultStore(ResultStoreInterface):
 
     def save_model_definition(self, definition: ModelDefinition) -> None:
         excluded_json = json.dumps(
-            [dt.isoformat() for dt in definition.excluded_points]
+            [
+                dt.replace(tzinfo=None).isoformat()
+                for dt in definition.excluded_points
+            ]
         )
         with self._conn:
             self._conn.execute(
@@ -159,7 +166,10 @@ class SqliteResultStore(ResultStoreInterface):
         ).fetchone()
         if row is None:
             return None
-        excluded = [datetime.fromisoformat(s) for s in json.loads(row[4])]
+        excluded = [
+            datetime.fromisoformat(s).replace(tzinfo=None)
+            for s in json.loads(row[4])
+        ]
         return ModelDefinition(
             category_id=row[0],
             baseline_start=row[1],
