@@ -8,7 +8,7 @@ description: React + Plotly.js + Ant Designによるフロントエンド実装�
 ## 技術スタック
 
 - **React 18** — UIフレームワーク
-- **Plotly.js** (react-plotly.js) — インタラクティブプロット
+- **Plotly.js** (plotly.js-gl2d-dist + react-plotly.js/factory) — WebGL描画（scattergl）、軽量バンドル
 - **Ant Design 5** — UIコンポーネント（Tree, Slider, Table, Layout, Segmented等）
 
 ## Ant Design: インポートルール（重要）
@@ -65,6 +65,7 @@ utils/categoryUtils.js          # カテゴリツリーのフラット化ユー�
 | `baselineStatus` / `baselineRange` | useBaselineManager | ベースライン設定状態 |
 | `interactionMode` | useBaselineManager | `'select'` / `'operate'` モード |
 | `sensitivity` / `excludedIndices` | useBaselineManager | 感度・除外点設定 |
+| `axisRange` | PlotView.jsx | ズーム/パン状態の保持（モード切替時に維持） |
 
 ## Ant Designコンポーネントの対応
 

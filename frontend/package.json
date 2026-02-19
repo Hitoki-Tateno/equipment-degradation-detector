@@ -6,7 +6,7 @@
     "@ant-design/icons": "^5.5.0",
     "antd": "^5.22.0",
     "axios": "^1.13.5",
-    "plotly.js": "^2.35.0",
+    "plotly.js-gl2d-dist": "^3.3.1",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
     "react-plotly.js": "^2.6.0"
