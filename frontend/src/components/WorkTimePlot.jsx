@@ -1,6 +1,7 @@
 import React, { useMemo, useCallback } from 'react';
 import Plot from 'react-plotly.js';
 
+// 感度値から異常スコアの閾値を算出（スコアが閾値未満で異常と判定）
 function computeThreshold(sensitivity, anomalies) {
   if (!anomalies || anomalies.length === 0) return 0;
   const scores = anomalies.map((a) => a.anomaly_score);
@@ -11,6 +12,13 @@ function computeThreshold(sensitivity, anomalies) {
 
 const PLOT_STYLE = { width: '100%', height: '400px' };
 
+/**
+ * 作業時間の散布図。Plotly.jsで描画し、ドラッグ選択・クリック操作を処理する。
+ *
+ * interactionMode により動作が切り替わる:
+ * - 'select': ドラッグでベースライン範囲選択、クリックで除外点トグル
+ * - 'operate': ズーム・パン操作
+ */
 function WorkTimePlot({
   records,
   trend,
@@ -18,7 +26,7 @@ function WorkTimePlot({
   sensitivity,
   baselineRange,
   excludedIndices,
-  baselineStatus,
+  interactionMode,
   onBaselineSelect,
   onToggleExclude,
 }) {
@@ -26,6 +34,7 @@ function WorkTimePlot({
   const y = useMemo(() => records.map((r) => r.work_time), [records]);
   const n = x.length;
 
+  // recorded_at → anomaly_score のルックアップマップ
   const anomalyMap = useMemo(() => {
     const map = {};
     if (anomalies) {
@@ -41,6 +50,7 @@ function WorkTimePlot({
     [sensitivity, anomalies],
   );
 
+  // 各ポイントの色: 除外=グレー, 異常=赤, 正常=青
   const markerColors = useMemo(() => {
     return records.map((r, i) => {
       if (excludedIndices && excludedIndices.includes(i)) return '#bfbfbf';
@@ -50,6 +60,7 @@ function WorkTimePlot({
     });
   }, [records, excludedIndices, anomalyMap, threshold]);
 
+  // 除外ポイントは×マーカー、それ以外は○
   const markerSymbols = useMemo(() => {
     return records.map((_, i) =>
       excludedIndices && excludedIndices.includes(i) ? 'x' : 'circle',
@@ -83,6 +94,7 @@ function WorkTimePlot({
     return t;
   }, [x, y, n, markerColors, markerSymbols, trend]);
 
+  // ベースライン範囲を半透明の矩形で表示
   const shapes = useMemo(() => {
     if (!baselineRange) return [];
     return [
@@ -104,9 +116,10 @@ function WorkTimePlot({
     ];
   }, [baselineRange]);
 
+  // ドラッグ選択完了 → ベースライン範囲をセット（選択モード時のみ）
   const handleSelected = useCallback(
     (event) => {
-      if (baselineStatus === 'configured') return;
+      if (interactionMode !== 'select') return;
       if (event && event.range && event.range.x && onBaselineSelect) {
         onBaselineSelect({
           start: event.range.x[0],
@@ -114,12 +127,13 @@ function WorkTimePlot({
         });
       }
     },
-    [baselineStatus, onBaselineSelect],
+    [interactionMode, onBaselineSelect],
   );
 
+  // ポイントクリック → 除外点をトグル（選択モード時のみ）
   const handleClick = useCallback(
     (event) => {
-      if (baselineStatus === 'configured') return;
+      if (interactionMode !== 'select') return;
       if (
         event &&
         event.points &&
@@ -129,19 +143,19 @@ function WorkTimePlot({
         onToggleExclude(event.points[0].pointIndex);
       }
     },
-    [baselineStatus, onToggleExclude],
+    [interactionMode, onToggleExclude],
   );
 
   const layout = useMemo(
     () => ({
-      dragmode: baselineStatus === 'configured' ? 'zoom' : 'select',
+      dragmode: interactionMode === 'select' ? 'select' : 'zoom',
       xaxis: { title: '記録日時', type: 'date' },
       yaxis: { title: '作業時間 t (秒)' },
       margin: { t: 20, r: 20 },
       autosize: true,
       shapes,
     }),
-    [baselineStatus, shapes],
+    [interactionMode, shapes],
   );
 
   return (
