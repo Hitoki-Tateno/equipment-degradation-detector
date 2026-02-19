@@ -68,16 +68,19 @@ function WorkTimePlot({
   }, [records, excludedIndices]);
 
   const traces = useMemo(() => {
-    const t = [
-      {
-        x,
-        y,
-        type: 'scatter',
-        mode: 'markers',
-        marker: { color: markerColors, size: 8, symbol: markerSymbols },
-        name: '作業時間',
-      },
-    ];
+    const scatterTrace = {
+      x,
+      y,
+      type: 'scatter',
+      mode: 'markers',
+      marker: { color: markerColors, size: 8, symbol: markerSymbols },
+      name: '作業時間',
+    };
+    // 操作モード時は選択ハイライトをクリア
+    if (interactionMode !== 'select') {
+      scatterTrace.selectedpoints = null;
+    }
+    const t = [scatterTrace];
     if (trend && n >= 2) {
       t.push({
         x: [x[0], x[n - 1]],
@@ -92,7 +95,7 @@ function WorkTimePlot({
       });
     }
     return t;
-  }, [x, y, n, markerColors, markerSymbols, trend]);
+  }, [x, y, n, markerColors, markerSymbols, trend, interactionMode]);
 
   // ベースライン範囲を半透明の矩形で表示
   const shapes = useMemo(() => {
@@ -149,6 +152,7 @@ function WorkTimePlot({
   const layout = useMemo(
     () => ({
       dragmode: interactionMode === 'select' ? 'select' : 'zoom',
+      selections: interactionMode === 'select' ? undefined : [],
       xaxis: { title: '記録日時', type: 'date' },
       yaxis: { title: '作業時間 t (秒)' },
       margin: { t: 20, r: 20 },
