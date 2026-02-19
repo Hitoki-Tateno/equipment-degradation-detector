@@ -3,7 +3,7 @@
 FeatureBuilder + トレンド分析 + オーケストレータ。
 """
 
-from datetime import datetime
+from datetime import UTC, datetime
 from unittest.mock import MagicMock
 
 import numpy as np
@@ -18,7 +18,12 @@ from backend.interfaces.data_store import (
     WorkRecord,
 )
 from backend.interfaces.feature import FeatureBuilder
-from backend.interfaces.result_store import ResultStoreInterface, TrendResult
+from backend.interfaces.result_store import (
+    AnomalyResult,
+    ModelDefinition,
+    ResultStoreInterface,
+    TrendResult,
+)
 
 
 class TestRawWorkTimeFeatureBuilder:
@@ -311,3 +316,302 @@ class TestAnalysisEngineRunAll:
 
         assert result == 1
         mock_data_store.get_records.assert_called_once_with(2)
+
+
+# --- 異常検知ブランチテスト (issue #26) ---
+
+
+class TestAnalysisEngineAnomalyDetection:
+    """AnalysisEngine の異常検知ブランチのテスト."""
+
+    def test_anomaly_scores_saved_when_model_defined(
+        self, engine, mock_data_store, mock_result_store
+    ):
+        """ModelDefinition存在 → 異常スコアが保存."""
+        records = [
+            WorkRecord(
+                category_id=1,
+                work_time=10.0,
+                recorded_at=datetime(2025, 1, 1),
+            ),
+            WorkRecord(
+                category_id=1,
+                work_time=10.5,
+                recorded_at=datetime(2025, 2, 1),
+            ),
+            WorkRecord(
+                category_id=1,
+                work_time=10.2,
+                recorded_at=datetime(2025, 3, 1),
+            ),
+        ]
+        mock_data_store.get_records.return_value = records
+        mock_result_store.get_model_definition.return_value = (
+            ModelDefinition(
+                category_id=1,
+                baseline_start=datetime(2025, 1, 1),
+                baseline_end=datetime(2025, 3, 1),
+                sensitivity=0.5,
+                excluded_points=[],
+            )
+        )
+
+        engine.run(1)
+
+        mock_result_store.save_anomaly_results\
+            .assert_called_once()
+        saved = (
+            mock_result_store
+            .save_anomaly_results.call_args[0][0]
+        )
+        assert len(saved) == 3
+        assert all(
+            isinstance(r, AnomalyResult) for r in saved
+        )
+        assert all(r.category_id == 1 for r in saved)
+
+    def test_excluded_points_removed(
+        self, engine, mock_data_store, mock_result_store
+    ):
+        """excluded_points はベースラインから除外."""
+        excluded_dt = datetime(2025, 2, 1)
+        records = [
+            WorkRecord(
+                category_id=1,
+                work_time=10.0,
+                recorded_at=datetime(2025, 1, 1),
+            ),
+            WorkRecord(
+                category_id=1,
+                work_time=999.0,
+                recorded_at=excluded_dt,
+            ),
+            WorkRecord(
+                category_id=1,
+                work_time=10.2,
+                recorded_at=datetime(2025, 3, 1),
+            ),
+        ]
+        mock_data_store.get_records.return_value = records
+        mock_result_store.get_model_definition.return_value = (
+            ModelDefinition(
+                category_id=1,
+                baseline_start=datetime(2025, 1, 1),
+                baseline_end=datetime(2025, 3, 1),
+                sensitivity=0.5,
+                excluded_points=[excluded_dt],
+            )
+        )
+
+        engine.run(1)
+
+        saved = (
+            mock_result_store
+            .save_anomaly_results.call_args[0][0]
+        )
+        assert len(saved) == 3
+
+    def test_no_anomaly_when_model_undefined(
+        self, engine, mock_data_store, mock_result_store
+    ):
+        """ModelDefinition未定義 → スコア保存なし."""
+        records = [
+            WorkRecord(
+                category_id=1,
+                work_time=10.0,
+                recorded_at=datetime(2025, 1, 1),
+            ),
+        ]
+        mock_data_store.get_records.return_value = records
+        mock_result_store.get_model_definition\
+            .return_value = None
+
+        engine.run(1)
+
+        mock_result_store.save_anomaly_results\
+            .assert_not_called()
+
+    def test_anomaly_timestamps_match_records(
+        self, engine, mock_data_store, mock_result_store
+    ):
+        """AnomalyResult の recorded_at がレコード順."""
+        dt1 = datetime(2025, 1, 1)
+        dt2 = datetime(2025, 2, 1)
+        records = [
+            WorkRecord(
+                category_id=1,
+                work_time=10.0,
+                recorded_at=dt1,
+            ),
+            WorkRecord(
+                category_id=1,
+                work_time=10.5,
+                recorded_at=dt2,
+            ),
+        ]
+        mock_data_store.get_records.return_value = records
+        mock_result_store.get_model_definition.return_value = (
+            ModelDefinition(
+                category_id=1,
+                baseline_start=dt1,
+                baseline_end=dt2,
+                sensitivity=0.5,
+                excluded_points=[],
+            )
+        )
+
+        engine.run(1)
+
+        saved = (
+            mock_result_store
+            .save_anomaly_results.call_args[0][0]
+        )
+        timestamps = [r.recorded_at for r in saved]
+        assert timestamps == [dt1, dt2]
+
+    def test_baseline_filters_by_date_range(
+        self, engine, mock_data_store, mock_result_store
+    ):
+        """ベースライン外レコードは全期間スコアのみ."""
+        records = [
+            WorkRecord(
+                category_id=1,
+                work_time=10.0,
+                recorded_at=datetime(2025, 1, 1),
+            ),
+            WorkRecord(
+                category_id=1,
+                work_time=10.5,
+                recorded_at=datetime(2025, 6, 1),
+            ),
+            WorkRecord(
+                category_id=1,
+                work_time=10.2,
+                recorded_at=datetime(2025, 12, 1),
+            ),
+        ]
+        mock_data_store.get_records.return_value = records
+        mock_result_store.get_model_definition.return_value = (
+            ModelDefinition(
+                category_id=1,
+                baseline_start=datetime(2025, 1, 1),
+                baseline_end=datetime(2025, 6, 30),
+                sensitivity=0.5,
+                excluded_points=[],
+            )
+        )
+
+        engine.run(1)
+
+        saved = (
+            mock_result_store
+            .save_anomaly_results.call_args[0][0]
+        )
+        assert len(saved) == 3
+
+    def test_empty_baseline_skips_anomaly(
+        self, engine, mock_data_store, mock_result_store
+    ):
+        """ベースライン空 → 異常検知スキップ."""
+        records = [
+            WorkRecord(
+                category_id=1,
+                work_time=10.0,
+                recorded_at=datetime(2025, 6, 1),
+            ),
+        ]
+        mock_data_store.get_records.return_value = records
+        mock_result_store.get_model_definition.return_value = (
+            ModelDefinition(
+                category_id=1,
+                baseline_start=datetime(2025, 1, 1),
+                baseline_end=datetime(2025, 3, 1),
+                sensitivity=0.5,
+                excluded_points=[],
+            )
+        )
+
+        engine.run(1)
+
+        mock_result_store.save_anomaly_results\
+            .assert_not_called()
+
+
+# --- offset-aware/naive 混在テスト (issue #55) ---
+
+
+class TestAnalysisEngineDatetimeMix:
+    """offset-aware ModelDefinition と offset-naive レコードの混在テスト."""
+
+    def test_aware_model_with_naive_records(
+        self, engine, mock_data_store, mock_result_store
+    ):
+        """offset-aware ModelDef + offset-naive records."""
+        records = [
+            WorkRecord(
+                category_id=1,
+                work_time=10.0,
+                recorded_at=datetime(2025, 1, 1),
+            ),
+            WorkRecord(
+                category_id=1,
+                work_time=10.5,
+                recorded_at=datetime(2025, 2, 1),
+            ),
+            WorkRecord(
+                category_id=1,
+                work_time=10.2,
+                recorded_at=datetime(2025, 3, 1),
+            ),
+        ]
+        mock_data_store.get_records.return_value = records
+        mock_result_store.get_model_definition.return_value = ModelDefinition(
+            category_id=1,
+            baseline_start=datetime(2025, 1, 1, tzinfo=UTC),
+            baseline_end=datetime(2025, 3, 1, tzinfo=UTC),
+            sensitivity=0.5,
+            excluded_points=[],
+        )
+
+        engine.run(1)
+
+        mock_result_store.save_anomaly_results.assert_called_once()
+        saved = mock_result_store.save_anomaly_results.call_args[0][0]
+        assert len(saved) == 3
+
+    def test_aware_excluded_points_with_naive_records(
+        self, engine, mock_data_store, mock_result_store
+    ):
+        """aware excluded_points + naive records."""
+        excluded_dt_aware = datetime(2025, 2, 1, tzinfo=UTC)
+        records = [
+            WorkRecord(
+                category_id=1,
+                work_time=10.0,
+                recorded_at=datetime(2025, 1, 1),
+            ),
+            WorkRecord(
+                category_id=1,
+                work_time=999.0,
+                recorded_at=datetime(2025, 2, 1),
+            ),
+            WorkRecord(
+                category_id=1,
+                work_time=10.2,
+                recorded_at=datetime(2025, 3, 1),
+            ),
+        ]
+        mock_data_store.get_records.return_value = records
+        mock_result_store.get_model_definition.return_value = ModelDefinition(
+            category_id=1,
+            baseline_start=datetime(2025, 1, 1, tzinfo=UTC),
+            baseline_end=datetime(2025, 3, 1, tzinfo=UTC),
+            sensitivity=0.5,
+            excluded_points=[excluded_dt_aware],
+        )
+
+        engine.run(1)
+
+        mock_result_store.save_anomaly_results.assert_called_once()
+        saved = mock_result_store.save_anomaly_results.call_args[0][0]
+        assert len(saved) == 3
