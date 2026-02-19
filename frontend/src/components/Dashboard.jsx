@@ -15,7 +15,7 @@ const STYLE_HEADER_ROW = {
 };
 const STYLE_TITLE_INLINE = { margin: 0 };
 
-function Dashboard({ categories, onNavigateToPlot }) {
+function Dashboard({ active, categories, onNavigateToPlot }) {
   const [dashboardData, setDashboardData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [analysisRunning, setAnalysisRunning] = useState(false);
@@ -53,8 +53,8 @@ function Dashboard({ categories, onNavigateToPlot }) {
   }, [categories]);
 
   useEffect(() => {
-    loadDashboardData();
-  }, [loadDashboardData]);
+    if (active) loadDashboardData();
+  }, [active, loadDashboardData]);
 
   const handleRunAnalysis = async () => {
     setAnalysisRunning(true);

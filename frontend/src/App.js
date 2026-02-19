@@ -23,6 +23,7 @@ const STYLE_PADDING_16 = { padding: '16px' };
 const STYLE_SPINNER = { display: 'block', marginTop: 24 };
 const STYLE_ALERT_MB = { marginBottom: 16 };
 const STYLE_SIDER_WRAPPER = { position: 'relative', display: 'flex', flexShrink: 0 };
+const STYLE_HIDDEN = { display: 'none' };
 
 /**
  * アプリケーションシェル。
@@ -139,16 +140,19 @@ function App() {
                 style={STYLE_ALERT_MB}
               />
             )}
-            <div className="plot-container">
-              {currentView === 'dashboard' ? (
-                <Dashboard
-                  categories={categories}
-                  onNavigateToPlot={handleNavigateToPlot}
-                />
-              ) : (
-                <PlotView categoryId={selectedCategoryId} />
-              )}
+            <div className="plot-container"
+                 style={currentView !== 'dashboard' ? STYLE_HIDDEN : undefined}>
+              <Dashboard
+                active={currentView === 'dashboard'}
+                categories={categories}
+                onNavigateToPlot={handleNavigateToPlot}
+              />
             </div>
+            {currentView === 'plot' && (
+              <div className="plot-container">
+                <PlotView categoryId={selectedCategoryId} />
+              </div>
+            )}
           </Content>
         </Layout>
       </Layout>
