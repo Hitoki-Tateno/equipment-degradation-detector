@@ -2,15 +2,25 @@
 
 import numpy as np
 
+from backend.analysis.anomaly import train_and_score
+from backend.analysis.feature import RawWorkTimeFeatureBuilder
 from backend.analysis.trend import compute_trend
-from backend.interfaces.data_store import CategoryNode, DataStoreInterface
-from backend.interfaces.result_store import ResultStoreInterface, TrendResult
+from backend.interfaces.data_store import (
+    CategoryNode,
+    DataStoreInterface,
+)
+from backend.interfaces.feature import FeatureBuilder
+from backend.interfaces.result_store import (
+    AnomalyResult,
+    ResultStoreInterface,
+    TrendResult,
+)
 
 
 class AnalysisEngine:
     """分析エンジン.
 
-    DataStore からデータを取得し、トレンド分析を実行し、
+    DataStore からデータを取得し、トレンド分析・異常検知を実行し、
     結果を ResultStore に保存する。
     """
 
@@ -18,16 +28,20 @@ class AnalysisEngine:
         self,
         data_store: DataStoreInterface,
         result_store: ResultStoreInterface,
+        feature_builder: FeatureBuilder | None = None,
     ) -> None:
         self._data_store = data_store
         self._result_store = result_store
+        if feature_builder is None:
+            feature_builder = RawWorkTimeFeatureBuilder()
+        self._feature_builder = feature_builder
 
     def run(self, category_id: int) -> None:
-        """指定カテゴリのトレンド分析を実行する.
+        """指定カテゴリの分析を実行する.
 
         1. Store から全期間データを取得
-        2. レコードが存在すればトレンド分析を実行し結果保存
-        3. モデル定義の有無を確認（異常検知は #7 で実装予定）
+        2. トレンド分析を実行し結果保存
+        3. モデル定義があれば IsolationForest で異常検知
         """
         records = self._data_store.get_records(category_id)
         if not records:
@@ -48,10 +62,39 @@ class AnalysisEngine:
             )
         )
 
-        # モデル定義チェック（異常検知は #7 で実装）
+        # 異常検知（IsolationForest）
         model_def = self._result_store.get_model_definition(category_id)
         if model_def is not None:
-            pass  # TODO: #7 Isolation Forest
+            bl_start = model_def.baseline_start.replace(tzinfo=None)
+            bl_end = model_def.baseline_end.replace(tzinfo=None)
+            baseline_records = [
+                r for r in records if bl_start <= r.recorded_at <= bl_end
+            ]
+            excluded = {
+                dt.replace(tzinfo=None) for dt in model_def.excluded_points
+            }
+            baseline_records = [
+                r for r in baseline_records if r.recorded_at not in excluded
+            ]
+            if not baseline_records:
+                return
+
+            baseline_wt = [r.work_time for r in baseline_records]
+            all_wt = [r.work_time for r in records]
+            baseline_feat = self._feature_builder.build(baseline_wt)
+            all_feat = self._feature_builder.build(all_wt)
+
+            scores = train_and_score(baseline_feat, all_feat)
+
+            anomaly_results = [
+                AnomalyResult(
+                    category_id=category_id,
+                    recorded_at=records[i].recorded_at,
+                    anomaly_score=float(scores[i]),
+                )
+                for i in range(len(records))
+            ]
+            self._result_store.save_anomaly_results(anomaly_results)
 
     def run_all(self) -> int:
         """全末端カテゴリに対してトレンド分析を実行する.

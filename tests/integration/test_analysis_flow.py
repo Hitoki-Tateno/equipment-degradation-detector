@@ -217,3 +217,146 @@ class TestDeleteModelClearsAnomalies:
         """未定義モデルの削除 → 404。"""
         resp = client.delete("/api/models/9999")
         assert resp.status_code == 404
+
+
+class TestModelCreationTriggersAnomaly:
+    """PUT /api/models → IsolationForest学習 → 異常スコア。"""
+
+    def test_put_model_triggers_anomaly_scores(self, client):
+        """モデル保存後に anomaly スコアが取得できる。"""
+        client.post(
+            "/api/records",
+            json={
+                "records": [
+                    {
+                        "category_path": ["P", "E"],
+                        "work_time": 10.0,
+                        "recorded_at": "2025-01-01T00:00:00",
+                    },
+                    {
+                        "category_path": ["P", "E"],
+                        "work_time": 10.5,
+                        "recorded_at": "2025-02-01T00:00:00",
+                    },
+                    {
+                        "category_path": ["P", "E"],
+                        "work_time": 10.2,
+                        "recorded_at": "2025-03-01T00:00:00",
+                    },
+                    {
+                        "category_path": ["P", "E"],
+                        "work_time": 100.0,
+                        "recorded_at": "2025-04-01T00:00:00",
+                    },
+                ]
+            },
+        )
+        tree = client.get("/api/categories")
+        leaf = tree.json()["categories"][0]["children"][0]
+        leaf_id = leaf["id"]
+
+        resp = client.put(
+            f"/api/models/{leaf_id}",
+            json={
+                "baseline_start": "2025-01-01T00:00:00",
+                "baseline_end": "2025-03-31T00:00:00",
+                "sensitivity": 0.5,
+                "excluded_points": [],
+            },
+        )
+        assert resp.status_code == 200
+        assert resp.json()["retrained"] is True
+
+        results = client.get(f"/api/results/{leaf_id}")
+        data = results.json()
+        assert len(data["anomalies"]) == 4
+        for a in data["anomalies"]:
+            assert "anomaly_score" in a
+            assert isinstance(a["anomaly_score"], float)
+
+    def test_delete_model_clears_anomalies(self, client):
+        """モデル削除 → 異常スコアもクリア。"""
+        client.post(
+            "/api/records",
+            json={
+                "records": [
+                    {
+                        "category_path": ["Q", "F"],
+                        "work_time": 10.0,
+                        "recorded_at": "2025-01-01T00:00:00",
+                    },
+                    {
+                        "category_path": ["Q", "F"],
+                        "work_time": 10.5,
+                        "recorded_at": "2025-02-01T00:00:00",
+                    },
+                ]
+            },
+        )
+        tree = client.get("/api/categories")
+        leaf_id = tree.json()["categories"][0]["children"][0]["id"]
+
+        client.put(
+            f"/api/models/{leaf_id}",
+            json={
+                "baseline_start": "2025-01-01T00:00:00",
+                "baseline_end": "2025-12-31T00:00:00",
+                "sensitivity": 0.5,
+                "excluded_points": [],
+            },
+        )
+        r1 = client.get(f"/api/results/{leaf_id}")
+        assert len(r1.json()["anomalies"]) == 2
+
+        client.delete(f"/api/models/{leaf_id}")
+
+        r2 = client.get(f"/api/results/{leaf_id}")
+        assert len(r2.json()["anomalies"]) == 0
+
+    def test_new_data_updates_anomalies(self, client):
+        """モデル定義済み → 新データ投入 → スコア更新。"""
+        client.post(
+            "/api/records",
+            json={
+                "records": [
+                    {
+                        "category_path": ["R", "G"],
+                        "work_time": 10.0,
+                        "recorded_at": "2025-01-01T00:00:00",
+                    },
+                    {
+                        "category_path": ["R", "G"],
+                        "work_time": 10.5,
+                        "recorded_at": "2025-02-01T00:00:00",
+                    },
+                ]
+            },
+        )
+        tree = client.get("/api/categories")
+        leaf_id = tree.json()["categories"][0]["children"][0]["id"]
+
+        client.put(
+            f"/api/models/{leaf_id}",
+            json={
+                "baseline_start": "2025-01-01T00:00:00",
+                "baseline_end": "2025-12-31T00:00:00",
+                "sensitivity": 0.5,
+                "excluded_points": [],
+            },
+        )
+
+        client.post(
+            "/api/records",
+            json={
+                "records": [
+                    {
+                        "category_path": ["R", "G"],
+                        "work_time": 100.0,
+                        "recorded_at": "2025-03-01T00:00:00",
+                    },
+                ]
+            },
+        )
+
+        results = client.get(f"/api/results/{leaf_id}")
+        assert len(results.json()["anomalies"]) == 3
