@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Table, Tag, Button, Space, Modal, Typography, Alert, message } from 'antd';
 import { DeleteOutlined, ThunderboltOutlined, LineChartOutlined } from '@ant-design/icons';
 import { fetchResults, fetchBaselineConfig, deleteBaselineConfig, triggerAnalysis } from '../services/api';
@@ -21,12 +21,17 @@ function Dashboard({ active, categories, onNavigateToPlot }) {
   const [analysisRunning, setAnalysisRunning] = useState(false);
   const [error, setError] = useState(null);
 
+  // categories を ref で保持し、loadDashboardData の依存を安定化
+  const categoriesRef = useRef(categories);
+  categoriesRef.current = categories;
+
   const loadDashboardData = useCallback(async () => {
-    if (!categories || categories.length === 0) return;
+    const cats = categoriesRef.current;
+    if (!cats || cats.length === 0) return;
     setLoading(true);
     setError(null);
     try {
-      const leaves = flattenLeafCategories(categories);
+      const leaves = flattenLeafCategories(cats);
       const data = await Promise.all(
         leaves.map(async (leaf) => {
           const [results, baselineDef] = await Promise.allSettled([
@@ -50,7 +55,7 @@ function Dashboard({ active, categories, onNavigateToPlot }) {
     } finally {
       setLoading(false);
     }
-  }, [categories]);
+  }, []);
 
   useEffect(() => {
     if (active) loadDashboardData();

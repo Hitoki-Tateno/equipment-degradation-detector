@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback } from 'react';
+import React, { useMemo, useCallback, useRef, useEffect } from 'react';
 import Plotly from 'plotly.js-gl2d-dist';
 import createPlotlyComponent from 'react-plotly.js/factory';
 
@@ -21,6 +21,9 @@ const PLOT_STYLE = { width: '100%', height: '400px' };
  * interactionMode により動作が切り替わる:
  * - 'select': ドラッグでベースライン範囲選択、クリックで除外点トグル
  * - 'operate': ズーム・パン操作
+ *
+ * ズーム/パン状態は Plotly の uirevision に委譲。
+ * 選択ハイライトのクリアは命令的 API (Plotly.restyle) で実行。
  */
 function WorkTimePlot({
   records,
@@ -30,14 +33,27 @@ function WorkTimePlot({
   baselineRange,
   excludedIndices,
   interactionMode,
-  axisRange,
+  categoryId,
   onBaselineSelect,
   onToggleExclude,
-  onRelayout,
 }) {
   const x = useMemo(() => records.map((r) => r.recorded_at), [records]);
   const y = useMemo(() => records.map((r) => r.work_time), [records]);
   const n = x.length;
+
+  // Plotly DOM 要素の参照（命令的API用）
+  const graphDivRef = useRef(null);
+
+  const handlePlotInitialized = useCallback((_figure, graphDiv) => {
+    graphDivRef.current = graphDiv;
+  }, []);
+
+  // 操作モードに切り替わった際にPlotlyの選択ハイライトを強制クリア
+  useEffect(() => {
+    if (interactionMode !== 'select' && graphDivRef.current) {
+      Plotly.restyle(graphDivRef.current, { selectedpoints: [null] }, [0]);
+    }
+  }, [interactionMode]);
 
   // recorded_at → anomaly_score のルックアップマップ
   const anomalyMap = useMemo(() => {
@@ -81,10 +97,6 @@ function WorkTimePlot({
       marker: { color: markerColors, size: 8, symbol: markerSymbols },
       name: '作業時間',
     };
-    // 操作モード時は選択ハイライトをクリア
-    if (interactionMode !== 'select') {
-      scatterTrace.selectedpoints = null;
-    }
     const t = [scatterTrace];
     if (trend && n >= 2) {
       t.push({
@@ -100,7 +112,7 @@ function WorkTimePlot({
       });
     }
     return t;
-  }, [x, y, n, markerColors, markerSymbols, trend, interactionMode]);
+  }, [x, y, n, markerColors, markerSymbols, trend]);
 
   // ベースライン範囲を半透明の矩形で表示
   const shapes = useMemo(() => {
@@ -158,24 +170,19 @@ function WorkTimePlot({
     () => ({
       dragmode: interactionMode === 'select' ? 'select' : 'zoom',
       selections: interactionMode === 'select' ? undefined : [],
+      uirevision: categoryId,
       xaxis: {
         title: '記録日時',
         type: 'date',
-        ...(axisRange?.x
-          ? { range: axisRange.x, autorange: false }
-          : {}),
       },
       yaxis: {
         title: '作業時間 t (秒)',
-        ...(axisRange?.y
-          ? { range: axisRange.y, autorange: false }
-          : {}),
       },
       margin: { t: 20, r: 20 },
       autosize: true,
       shapes,
     }),
-    [interactionMode, shapes, axisRange],
+    [interactionMode, shapes, categoryId],
   );
 
   return (
@@ -184,7 +191,7 @@ function WorkTimePlot({
       layout={layout}
       onSelected={handleSelected}
       onClick={handleClick}
-      onRelayout={onRelayout}
+      onInitialized={handlePlotInitialized}
       useResizeHandler
       style={PLOT_STYLE}
     />
