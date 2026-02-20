@@ -61,7 +61,7 @@
 レスポンス:
   {
     "trend": { "slope": 0.05, "intercept": 10.0, "is_warning": false },
-    "anomalies": [{ "recorded_at": "2025-01-01T00:00:00", "anomaly_score": -0.35 }]
+    "anomalies": [{ "recorded_at": "2025-01-01T00:00:00", "anomaly_score": 0.65 }]
   }
 
 備考: trend または anomalies が未計算の場合は null を返す

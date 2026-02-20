@@ -14,7 +14,7 @@ class TrendResult:
 class AnomalyResult:
     category_id: int
     recorded_at: datetime
-    anomaly_score: float   # score_samples()の生スコア（boolean不可）
+    anomaly_score: float   # 原論文準拠の正規化スコア 0〜1（1=異常, boolean不可）
 
 @dataclass
 class ModelDefinition:
@@ -58,4 +58,4 @@ class ModelDefinition:
 
 ## 重要: anomaly_scoreについて
 
-scikit-learnのIsolation Forestの`score_samples()`が返す生スコアを保存する。このスコアはcontamination（感度）に依存しない。閾値判定はフロントエンド側で実行するため、結果ストアにはスコア値のみを保持する。
+scikit-learnのIsolation Forestの`-score_samples()`で算出した原論文準拠の正規化スコア（0〜1、1に近いほど異常）を保存する。このスコアはcontamination（感度）に依存しない。閾値判定はフロントエンド側で実行するため、結果ストアにはスコア値のみを保持する。

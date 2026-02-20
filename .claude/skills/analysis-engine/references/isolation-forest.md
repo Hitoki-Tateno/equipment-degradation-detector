@@ -12,7 +12,7 @@
 
 ## 設計上の帰結
 
-1. **score_samples()の生スコアを結果ストアに保存する**（anomaly_score: REAL）
+1. **-score_samples()で原論文準拠の正規化スコア(0〜1)に変換して結果ストアに保存する**（anomaly_score: REAL、1に近いほど異常）
 2. **感度スライダーはフロントエンドで閾値を適用するだけ** → API不要、再学習不要
 3. **再学習が必要なのはベースライン期間または除外点が変更されたときのみ**
 
@@ -31,7 +31,7 @@ def train_and_score(
     """ベースラインで学習し、全データのスコアを算出する。
 
     Returns:
-        anomaly_scores: 各データポイントのscore_samples()値
+        anomaly_scores: 原論文準拠の異常スコア (0〜1, 1に近いほど異常)
     """
     model = IsolationForest(
         n_estimators=n_estimators,
@@ -39,7 +39,7 @@ def train_and_score(
         contamination="auto",  # offset計算のみ。スコア自体には影響しない
     )
     model.fit(baseline_data)
-    return model.score_samples(all_data)
+    return -model.score_samples(all_data)
 ```
 
 ## 固定パラメータ（ユーザー非公開）

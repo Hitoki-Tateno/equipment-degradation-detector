@@ -15,7 +15,7 @@ def train_and_score(
         all_data: 全期間特徴量 (n_all, d).
 
     Returns:
-        score_samples() の生値 (n_all,).
+        原論文準拠の異常スコア (n_all,). 0〜1, 1に近いほど異常.
     """
     model = IsolationForest(
         n_estimators=100,
@@ -23,4 +23,4 @@ def train_and_score(
         contamination="auto",
     )
     model.fit(baseline_data)
-    return model.score_samples(all_data)
+    return -model.score_samples(all_data)

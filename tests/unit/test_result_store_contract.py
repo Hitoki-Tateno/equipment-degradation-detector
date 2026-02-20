@@ -71,12 +71,12 @@ class TestAnomalyResults:
             AnomalyResult(
                 category_id=1,
                 recorded_at=datetime(2025, 1, 1),
-                anomaly_score=-0.3,
+                anomaly_score=0.3,
             ),
             AnomalyResult(
                 category_id=1,
                 recorded_at=datetime(2025, 1, 2),
-                anomaly_score=-0.8,
+                anomaly_score=0.8,
             ),
         ]
         result_store.save_anomaly_results(results)
@@ -94,12 +94,12 @@ class TestAnomalyResults:
             AnomalyResult(
                 category_id=1,
                 recorded_at=datetime(2025, 1, 1),
-                anomaly_score=-0.3,
+                anomaly_score=0.3,
             ),
             AnomalyResult(
                 category_id=1,
                 recorded_at=datetime(2025, 1, 2),
-                anomaly_score=-0.8,
+                anomaly_score=0.8,
             ),
         ]
         result_store.save_anomaly_results(results)
@@ -164,7 +164,7 @@ class TestDatetimeNormalization:
             AnomalyResult(
                 category_id=1,
                 recorded_at=datetime(2025, 1, 1, tzinfo=UTC),
-                anomaly_score=-0.5,
+                anomaly_score=0.5,
             ),
         ]
         result_store.save_anomaly_results(results)
