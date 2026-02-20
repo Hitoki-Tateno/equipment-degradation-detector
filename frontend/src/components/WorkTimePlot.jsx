@@ -105,7 +105,7 @@ function WorkTimePlot({
           trend.intercept + trend.slope * 1,
           trend.intercept + trend.slope * n,
         ],
-        type: 'scattergl',
+        type: 'scatter',
         mode: 'lines',
         line: { color: 'red', dash: 'dash' },
         name: 'トレンド',
