@@ -4,13 +4,13 @@ import createPlotlyComponent from 'react-plotly.js/factory';
 
 const Plot = createPlotlyComponent(Plotly);
 
-// 感度値から異常スコアの閾値を算出（スコアが閾値未満で異常と判定）
+// 感度値から異常スコアの閾値を算出（スコアが閾値超過で異常と判定。0〜1、1=異常）
 function computeThreshold(sensitivity, anomalies) {
   if (!anomalies || anomalies.length === 0) return 0;
   const scores = anomalies.map((a) => a.anomaly_score);
   const min = Math.min(...scores);
   const max = Math.max(...scores);
-  return min + sensitivity * (max - min);
+  return max - sensitivity * (max - min);
 }
 
 const PLOT_STYLE = { width: '100%', height: '400px' };
@@ -76,7 +76,7 @@ function WorkTimePlot({
     return records.map((r, i) => {
       if (excludedIndices && excludedIndices.includes(i)) return '#bfbfbf';
       const score = anomalyMap[r.recorded_at];
-      if (score !== undefined && score < threshold) return '#ff4d4f';
+      if (score !== undefined && score > threshold) return '#ff4d4f';
       return '#1890ff';
     });
   }, [records, excludedIndices, anomalyMap, threshold]);
