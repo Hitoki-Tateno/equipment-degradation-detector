@@ -8,8 +8,8 @@ from backend.analysis.anomaly import train_and_score
 class TestTrainAndScore:
     """train_and_score() のテスト."""
 
-    def test_outlier_scores_lower_than_normal_mean(self):
-        """明確な外れ値 → スコアが正常点の平均より低い."""
+    def test_outlier_scores_higher_than_normal_mean(self):
+        """明確な外れ値 → スコアが正常点の平均より高い (1に近い=異常)."""
         rng = np.random.default_rng(0)
         normal = 10.0 + rng.normal(0, 0.3, size=200)
         baseline = normal.reshape(-1, 1)
@@ -21,7 +21,7 @@ class TestTrainAndScore:
 
         assert scores.shape == (201,)
         normal_mean = scores[:200].mean()
-        assert scores[200] < normal_mean
+        assert scores[200] > normal_mean
 
     def test_baseline_only_returns_finite_scores(self):
         """ベースラインのみ → 全スコアが有限."""

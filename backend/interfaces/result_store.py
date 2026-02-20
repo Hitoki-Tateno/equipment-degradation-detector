@@ -23,7 +23,8 @@ class TrendResult:
 class AnomalyResult:
     """異常スコア結果。
 
-    anomaly_score は scikit-learn の score_samples() の生スコア。
+    anomaly_score は原論文準拠の正規化スコア (0〜1, 1に近いほど異常)。
+    scikit-learn の -score_samples() で算出。
     booleanではなくfloat。閾値判定はフロントエンド側で実行する。
     """
 

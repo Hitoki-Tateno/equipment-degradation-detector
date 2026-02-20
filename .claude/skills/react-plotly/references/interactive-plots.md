@@ -136,7 +136,7 @@ const handleRelayout = useCallback((update) => {
 ## マーカーの色分け（異常スコア × 感度 × 除外状態）
 
 ```jsx
-// 感度値から閾値を算出（スコアが閾値未満で異常と判定）
+// 感度値から閾値を算出（スコアが閾値超過で異常と判定。スコアは0〜1、1に近いほど異常）
 function computeThreshold(sensitivity, anomalies) {
   if (!anomalies || anomalies.length === 0) return 0;
   const scores = anomalies.map((a) => a.anomaly_score);
@@ -150,7 +150,7 @@ const markerColors = useMemo(() => {
   return records.map((r, i) => {
     if (excludedIndices && excludedIndices.includes(i)) return '#bfbfbf';
     const score = anomalyMap[r.recorded_at];
-    if (score !== undefined && score < threshold) return '#ff4d4f';
+    if (score !== undefined && score > threshold) return '#ff4d4f';
     return '#1890ff';
   });
 }, [records, excludedIndices, anomalyMap, threshold]);

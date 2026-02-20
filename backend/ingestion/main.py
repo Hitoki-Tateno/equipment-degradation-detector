@@ -9,7 +9,7 @@ from typing import Annotated
 
 import pandas as pd
 from fastapi import Depends, FastAPI, HTTPException, UploadFile
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 from backend.analysis.engine import AnalysisEngine
 from backend.dependencies import (
@@ -90,7 +90,13 @@ class AnomalyResultResponse(BaseModel):
     """異常スコア結果のレスポンス。"""
 
     recorded_at: datetime
-    anomaly_score: float
+    anomaly_score: float = Field(
+        description=(
+            "原論文準拠の異常スコア (0〜1)。"
+            "1に近いほど異常、0.5未満は正常。"
+            "-score_samples() で算出。"
+        ),
+    )
 
 
 class ModelDefinitionRequest(BaseModel):
