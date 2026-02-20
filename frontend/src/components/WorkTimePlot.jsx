@@ -48,9 +48,14 @@ function WorkTimePlot({
     graphDivRef.current = graphDiv;
   }, []);
 
-  // 操作モードに切り替わった際にPlotlyの選択ハイライトを強制クリア
+  // モード切替時の命令的更新
   useEffect(() => {
-    if (interactionMode !== 'select' && graphDivRef.current) {
+    if (!graphDivRef.current) return;
+    if (interactionMode === 'select') {
+      // scattergl は dragmode:'select' 時のみ stash.xpx/ypx を計算する。
+      // layout だけの更新では plot 関数が再実行されないため、強制再描画で再計算させる。
+      Plotly.redraw(graphDivRef.current);
+    } else {
       Plotly.restyle(graphDivRef.current, { selectedpoints: [null] }, [0]);
     }
   }, [interactionMode]);
