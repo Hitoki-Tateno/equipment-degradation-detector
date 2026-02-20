@@ -142,7 +142,7 @@ function computeThreshold(sensitivity, anomalies) {
   const scores = anomalies.map((a) => a.anomaly_score);
   const min = Math.min(...scores);
   const max = Math.max(...scores);
-  return min + sensitivity * (max - min);
+  return max - sensitivity * (max - min);
 }
 
 // 各ポイントの色: 除外=グレー(#bfbfbf), 異常=赤(#ff4d4f), 正常=青(#1890ff)
