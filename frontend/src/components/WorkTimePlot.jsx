@@ -169,6 +169,7 @@ function WorkTimePlot({
   const layout = useMemo(
     () => ({
       dragmode: interactionMode === 'select' ? 'select' : 'zoom',
+      selectdirection: interactionMode === 'select' ? 'h' : undefined,
       selections: interactionMode === 'select' ? undefined : [],
       uirevision: categoryId,
       xaxis: {
