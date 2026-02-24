@@ -74,6 +74,29 @@ function Dashboard({ active, categories, onNavigateToPlot }) {
     }
   };
 
+  const updateSingleRow = useCallback(async (categoryId) => {
+    const [results, baselineDef] = await Promise.allSettled([
+      fetchResults(categoryId),
+      fetchBaselineConfig(categoryId),
+    ]);
+    setDashboardData((prev) =>
+      prev.map((row) =>
+        row.categoryId === categoryId
+          ? {
+              ...row,
+              trend: results.status === 'fulfilled' ? results.value.trend : null,
+              anomalyCount:
+                results.status === 'fulfilled'
+                  ? (results.value.anomalies || []).length
+                  : 0,
+              baselineStatus:
+                baselineDef.status === 'fulfilled' ? 'configured' : 'unconfigured',
+            }
+          : row,
+      ),
+    );
+  }, []);
+
   const handleDeleteBaseline = useCallback(
     (categoryId) => {
       Modal.confirm({
@@ -84,11 +107,11 @@ function Dashboard({ active, categories, onNavigateToPlot }) {
         cancelText: 'キャンセル',
         onOk: async () => {
           await deleteBaselineConfig(categoryId);
-          await loadDashboardData();
+          await updateSingleRow(categoryId);
         },
       });
     },
-    [loadDashboardData],
+    [updateSingleRow],
   );
 
   const columns = useMemo(
