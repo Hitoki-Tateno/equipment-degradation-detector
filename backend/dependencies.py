@@ -5,12 +5,14 @@ backend/ 直下に配置することで、ingestion/ から store/ への
 """
 
 from backend.analysis.engine import AnalysisEngine
+from backend.ingestion.event_bus import EventBus
 from backend.interfaces.data_store import DataStoreInterface
 from backend.interfaces.result_store import ResultStoreInterface
 
 _data_store: DataStoreInterface | None = None
 _result_store: ResultStoreInterface | None = None
 _analysis_engine: AnalysisEngine | None = None
+_event_bus: EventBus | None = None
 
 
 def get_data_store() -> DataStoreInterface:
@@ -41,9 +43,18 @@ def get_analysis_engine() -> AnalysisEngine:
     return _analysis_engine
 
 
+def get_event_bus() -> EventBus:
+    """EventBusのシングルトンインスタンスを返す。"""
+    global _event_bus
+    if _event_bus is None:
+        _event_bus = EventBus()
+    return _event_bus
+
+
 def _reset_all() -> None:
     """全シングルトンをリセットする（テスト用）。"""
-    global _data_store, _result_store, _analysis_engine
+    global _data_store, _result_store, _analysis_engine, _event_bus
     _data_store = None
     _result_store = None
     _analysis_engine = None
+    _event_bus = None

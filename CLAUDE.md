@@ -25,7 +25,11 @@ backend/result_store/ ← analysis/ や ingestion/ から直接import禁止
                                   |        |
                                   v        v
                               結果ストア --> データ提供API --> 表示層(React)
+                                  |                          ↑
+                              EventBus -----> SSE ----------/
 ```
+
+**リアルタイム通知**: データ変更エンドポイント完了時に EventBus → SSE でフロントエンドへ `dashboard-updated` イベントを配信。ダッシュボードはバッチAPI (`GET /api/dashboard/summary`) で1リクエストに集約して再取得する。
 
 ## ディレクトリ構成
 

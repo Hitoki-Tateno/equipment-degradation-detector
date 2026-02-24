@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Table, Tag, Button, Space, Modal, Typography, Alert, message } from 'antd';
 import { DeleteOutlined, ThunderboltOutlined, LineChartOutlined } from '@ant-design/icons';
-import { fetchResults, fetchBaselineConfig, deleteBaselineConfig, triggerAnalysis } from '../services/api';
-import { flattenLeafCategories } from '../utils/categoryUtils';
+import { fetchDashboardSummary, fetchResults, fetchBaselineConfig, deleteBaselineConfig, triggerAnalysis } from '../services/api';
 
 const { Title } = Typography;
 
@@ -15,41 +14,33 @@ const STYLE_HEADER_ROW = {
 };
 const STYLE_TITLE_INLINE = { margin: 0 };
 
+const SSE_DEBOUNCE_MS = 2000;
+
 function Dashboard({ active, categories, onNavigateToPlot }) {
   const [dashboardData, setDashboardData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [analysisRunning, setAnalysisRunning] = useState(false);
   const [error, setError] = useState(null);
 
-  // categories を ref で保持し、loadDashboardData の依存を安定化
-  const categoriesRef = useRef(categories);
-  categoriesRef.current = categories;
+  // SSE 受信時に非アクティブなら stale フラグを立て、復帰時に再取得
+  const staleRef = useRef(false);
 
   const loadDashboardData = useCallback(async () => {
-    const cats = categoriesRef.current;
-    if (!cats || cats.length === 0) return;
     setLoading(true);
     setError(null);
     try {
-      const leaves = flattenLeafCategories(cats);
-      const data = await Promise.all(
-        leaves.map(async (leaf) => {
-          const [results, baselineDef] = await Promise.allSettled([
-            fetchResults(leaf.id),
-            fetchBaselineConfig(leaf.id),
-          ]);
-          return {
-            key: leaf.id,
-            categoryId: leaf.id,
-            categoryPath: leaf.path,
-            trend: results.status === 'fulfilled' ? results.value.trend : null,
-            anomalyCount:
-              results.status === 'fulfilled' ? (results.value.anomalies || []).length : 0,
-            baselineStatus: baselineDef.status === 'fulfilled' ? 'configured' : 'unconfigured',
-          };
-        }),
+      const summaries = await fetchDashboardSummary();
+      setDashboardData(
+        summaries.map((s) => ({
+          key: s.category_id,
+          categoryId: s.category_id,
+          categoryPath: s.category_path,
+          trend: s.trend,
+          anomalyCount: s.anomaly_count,
+          baselineStatus: s.baseline_status,
+        })),
       );
-      setDashboardData(data);
+      staleRef.current = false;
     } catch (err) {
       setError(`ダッシュボードデータ取得エラー: ${err.message}`);
     } finally {
@@ -57,15 +48,45 @@ function Dashboard({ active, categories, onNavigateToPlot }) {
     }
   }, []);
 
+  // 初回ロード + アクティブ復帰時の再取得
   useEffect(() => {
-    if (active && categories && categories.length > 0) loadDashboardData();
-  }, [active, categories, loadDashboardData]);
+    if (!active) return;
+    // 初回（データ未取得）または stale 時に取得
+    if (dashboardData.length === 0 || staleRef.current) {
+      if (categories && categories.length > 0) loadDashboardData();
+    }
+  }, [active, categories, loadDashboardData, dashboardData.length]);
+
+  // SSE 接続: バックエンドのデータ変更を監視
+  useEffect(() => {
+    const es = new EventSource('/api/events');
+    let debounceTimer = null;
+
+    const handleUpdate = () => {
+      if (active) {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => loadDashboardData(), SSE_DEBOUNCE_MS);
+      } else {
+        staleRef.current = true;
+      }
+    };
+
+    es.addEventListener('dashboard-updated', handleUpdate);
+
+    return () => {
+      clearTimeout(debounceTimer);
+      es.removeEventListener('dashboard-updated', handleUpdate);
+      es.close();
+    };
+  }, [active, loadDashboardData]);
 
   const handleRunAnalysis = async () => {
     setAnalysisRunning(true);
     try {
       const result = await triggerAnalysis();
       message.success(`分析完了: ${result.processed_categories} カテゴリ処理しました`);
+      // SSE 経由で dashboard-updated が届くが、分析実行ボタンの
+      // ローディング表示と同期するため明示的にも取得する
       await loadDashboardData();
     } catch (err) {
       message.error(`分析実行エラー: ${err.message}`);
@@ -74,6 +95,7 @@ function Dashboard({ active, categories, onNavigateToPlot }) {
     }
   };
 
+  // ダッシュボード上の単行削除用（#72 パターン維持）
   const updateSingleRow = useCallback(async (categoryId) => {
     const [results, baselineDef] = await Promise.allSettled([
       fetchResults(categoryId),

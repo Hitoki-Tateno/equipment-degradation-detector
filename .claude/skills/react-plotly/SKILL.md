@@ -159,6 +159,80 @@ export default React.memo(MyComponent);
 
 [references/interactive-plots.md](references/interactive-plots.md) を参照。
 
+## ダッシュボードのデータ取得パターン（SSE + バッチAPI）
+
+Dashboard はバッチAPI + SSE（Server-Sent Events）でデータを取得・更新する。個別カテゴリごとのフェッチは行わない:
+
+### バッチAPI
+
+`GET /api/dashboard/summary` で全リーフカテゴリのサマリーを1リクエストで一括取得:
+
+```javascript
+import { fetchDashboardSummary } from '../services/api';
+
+const loadDashboardData = useCallback(async () => {
+  const summaries = await fetchDashboardSummary();
+  setDashboardData(summaries.map((s) => ({
+    key: s.category_id,
+    categoryId: s.category_id,
+    categoryPath: s.category_path,
+    trend: s.trend,
+    anomalyCount: s.anomaly_count,
+    baselineStatus: s.baseline_status,
+  })));
+}, []);
+```
+
+### SSE 接続（EventSource）
+
+`GET /api/events` に `EventSource` で接続し、バックエンドのデータ変更をリアルタイム検知:
+
+```javascript
+const SSE_DEBOUNCE_MS = 2000;
+
+useEffect(() => {
+  const es = new EventSource('/api/events');
+  let debounceTimer = null;
+
+  const handleUpdate = () => {
+    if (active) {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => loadDashboardData(), SSE_DEBOUNCE_MS);
+    } else {
+      staleRef.current = true;
+    }
+  };
+
+  es.addEventListener('dashboard-updated', handleUpdate);
+  return () => {
+    clearTimeout(debounceTimer);
+    es.removeEventListener('dashboard-updated', handleUpdate);
+    es.close();
+  };
+}, [active, loadDashboardData]);
+```
+
+### staleRef パターン
+
+Dashboard が非アクティブ（プロットビュー表示中）に SSE イベントを受信した場合、`staleRef.current = true` を設定。`active` に復帰した時点で再取得する:
+
+```javascript
+const staleRef = useRef(false);
+
+useEffect(() => {
+  if (!active) return;
+  if (dashboardData.length === 0 || staleRef.current) {
+    if (categories && categories.length > 0) loadDashboardData();
+  }
+}, [active, categories, loadDashboardData, dashboardData.length]);
+```
+
+### 注意事項
+
+- `flattenLeafCategories` は Dashboard では使用しない（バッチAPI がサーバー側でパス文字列を組み立てる）
+- `updateSingleRow` はダッシュボード上のインライン削除用に維持（削除した行のみ差分更新）
+- デバウンス（2秒）はデータ連続投入時の SSE イベント連打を集約するため
+
 ## 開発コマンド
 
 ```bash

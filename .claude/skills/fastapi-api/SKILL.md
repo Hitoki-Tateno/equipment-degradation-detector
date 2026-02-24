@@ -70,7 +70,64 @@ for category_id in affected_category_ids:
 - **DELETE /api/models/{category_id}**: モデルを削除。異常検知結果もカスケード削除
 - **GET /api/models/{category_id}**: モデル定義を取得。未定義なら404
 
+## EventBus とリアルタイム通知（SSE）
+
+データ変更時にフロントエンドへリアルタイム通知するため、EventBus + SSE パターンを採用:
+
+### EventBus
+
+`backend/ingestion/event_bus.py` の `EventBus` クラス（`asyncio.Queue` ベースのインメモリ pub/sub）。`backend/dependencies.py` の `get_event_bus()` で DI 注入:
+
+```python
+from backend.dependencies import get_event_bus
+from backend.ingestion.event_bus import EventBus
+
+EventBusDep = Annotated[EventBus, Depends(get_event_bus)]
+```
+
+### publish パターン
+
+データ変更エンドポイントの処理完了後に `bus.publish("dashboard-updated")` を呼び出す:
+
+```python
+@app.post("/api/records")
+async def post_records(body: ..., store: StoreDep, engine: EngineDep, bus: EventBusDep):
+    # ... データ処理 + 分析実行 ...
+    bus.publish("dashboard-updated")
+    return {"inserted": inserted}
+```
+
+**publish が必要なエンドポイント:**
+- `POST /api/records` — レコード投入 + 分析完了後
+- `POST /api/records/csv` — CSV投入 + 分析完了後
+- `PUT /api/models/{category_id}` — モデル保存 + 分析完了後
+- `DELETE /api/models/{category_id}` — モデル削除完了後
+- `POST /api/analysis/run` — 手動分析完了後
+
+### SSE エンドポイント
+
+`GET /api/events` で `text/event-stream` を配信。`StreamingResponse` を使用し、追加パッケージ不要:
+
+```python
+@app.get("/api/events")
+async def events(bus: EventBusDep):
+    async def stream_with_keepalive():
+        async with bus.subscribe() as queue:
+            while True:
+                try:
+                    event = await asyncio.wait_for(queue.get(), timeout=30)
+                    yield f"event: {event['event']}\ndata: ...\n\n"
+                except TimeoutError:
+                    yield ": keepalive\n\n"
+    return StreamingResponse(stream_with_keepalive(), media_type="text/event-stream")
+```
+
+### ダッシュボードバッチAPI
+
+`GET /api/dashboard/summary` で全リーフカテゴリのサマリーを一括返却。既存の `ResultStoreInterface` メソッドをループで呼び出す（インターフェース変更不要）。
+
 ## 注意事項
 
 - `category_path` で指定された分類がツリーに存在しなければ `ensure_category_path` で自動作成
 - ヘルスチェック `GET /api/health` は実装済み
+- 新規エンドポイント追加時、データ変更を伴う場合は `bus.publish("dashboard-updated")` を忘れないこと

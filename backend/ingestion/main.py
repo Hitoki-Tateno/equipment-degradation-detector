@@ -1,22 +1,27 @@
 """FastAPIアプリケーション。
 
-取り込みAPI + データ提供API + 分析結果APIを統合。
+取り込みAPI + データ提供API + 分析結果API + SSEを統合。
 """
 
+import asyncio
 import io
+import json
 from datetime import datetime
 from typing import Annotated
 
 import pandas as pd
 from fastapi import Depends, FastAPI, HTTPException, UploadFile
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, field_validator
 
 from backend.analysis.engine import AnalysisEngine
 from backend.dependencies import (
     get_analysis_engine,
     get_data_store,
+    get_event_bus,
     get_result_store,
 )
+from backend.ingestion.event_bus import EventBus
 from backend.interfaces.data_store import (
     CategoryNode,
     DataStoreInterface,
@@ -30,6 +35,7 @@ from backend.interfaces.result_store import (
 StoreDep = Annotated[DataStoreInterface, Depends(get_data_store)]
 ResultStoreDep = Annotated[ResultStoreInterface, Depends(get_result_store)]
 EngineDep = Annotated[AnalysisEngine, Depends(get_analysis_engine)]
+EventBusDep = Annotated[EventBus, Depends(get_event_bus)]
 
 app = FastAPI(
     title="設備劣化検知システム API",
@@ -133,6 +139,16 @@ class ModelDefinitionResponse(BaseModel):
     excluded_points: list[datetime]
 
 
+class DashboardCategorySummary(BaseModel):
+    """ダッシュボードサマリーの1カテゴリ分。"""
+
+    category_id: int
+    category_path: str
+    trend: TrendResultResponse | None
+    anomaly_count: int
+    baseline_status: str  # "configured" | "unconfigured"
+
+
 # ---------- ヘルパー ----------
 
 
@@ -144,6 +160,24 @@ def _to_category_node_response(node: CategoryNode) -> CategoryNodeResponse:
         parent_id=node.parent_id,
         children=[_to_category_node_response(c) for c in node.children],
     )
+
+
+def _collect_leaves_with_paths(
+    nodes: list[CategoryNode], parent_path: str = ""
+) -> list[tuple[int, str]]:
+    """カテゴリツリーから末端ノードを (id, パス文字列) で収集する。"""
+    leaves: list[tuple[int, str]] = []
+    for node in nodes:
+        current_path = (
+            f"{parent_path} > {node.name}" if parent_path else node.name
+        )
+        if not node.children:
+            leaves.append((node.id, current_path))
+        else:
+            leaves.extend(
+                _collect_leaves_with_paths(node.children, current_path)
+            )
+    return leaves
 
 
 # ---------- エンドポイント ----------
@@ -160,6 +194,7 @@ async def post_records(
     body: RecordsBatchRequest,
     store: StoreDep,
     engine: EngineDep,
+    bus: EventBusDep,
 ):
     """作業記録をバッチ投入する。"""
     work_records: list[WorkRecord] = []
@@ -179,6 +214,7 @@ async def post_records(
     for cid in affected_category_ids:
         engine.run(cid)
 
+    bus.publish("dashboard-updated")
     return {"inserted": inserted}
 
 
@@ -187,6 +223,7 @@ async def post_records_csv(
     file: UploadFile,
     store: StoreDep,
     engine: EngineDep,
+    bus: EventBusDep,
 ):
     """CSVファイルから作業記録をバッチ投入する（デバッグ用）。"""
     content = await file.read()
@@ -233,6 +270,7 @@ async def post_records_csv(
     for cid in affected_category_ids:
         engine.run(cid)
 
+    bus.publish("dashboard-updated")
     return {"inserted": inserted, "skipped": skipped}
 
 
@@ -319,6 +357,7 @@ async def put_model_definition(
     body: ModelDefinitionRequest,
     result_store: ResultStoreDep,
     engine: EngineDep,
+    bus: EventBusDep,
 ):
     """モデル定義を保存し、異常検知を実行する."""
     existing = result_store.get_model_definition(category_id)
@@ -337,6 +376,7 @@ async def put_model_definition(
     )
     result_store.save_model_definition(definition)
     engine.run(category_id)
+    bus.publish("dashboard-updated")
     return {"retrained": baseline_changed}
 
 
@@ -344,6 +384,7 @@ async def put_model_definition(
 async def delete_model_definition_endpoint(
     category_id: int,
     result_store: ResultStoreDep,
+    bus: EventBusDep,
 ):
     """モデル定義を削除する。異常検知結果もカスケード削除。未定義なら404。"""
     existing = result_store.get_model_definition(category_id)
@@ -353,14 +394,79 @@ async def delete_model_definition_endpoint(
         )
     result_store.delete_anomaly_results(category_id)
     result_store.delete_model_definition(category_id)
+    bus.publish("dashboard-updated")
     return {"deleted": True}
 
 
 @app.post("/api/analysis/run")
-async def run_analysis(engine: EngineDep):
+async def run_analysis(engine: EngineDep, bus: EventBusDep):
     """全末端カテゴリに対して分析を手動トリガーする。"""
     count = engine.run_all()
+    bus.publish("dashboard-updated")
     return {"processed_categories": count}
+
+
+# ---------- ダッシュボード ----------
+
+
+@app.get("/api/dashboard/summary")
+async def get_dashboard_summary(
+    store: StoreDep,
+    result_store: ResultStoreDep,
+):
+    """ダッシュボード用サマリーを一括取得する。"""
+    tree = store.get_category_tree()
+    leaves = _collect_leaves_with_paths(tree)
+
+    summaries = []
+    for cat_id, cat_path in leaves:
+        trend = result_store.get_trend_result(cat_id)
+        anomalies = result_store.get_anomaly_results(cat_id)
+        model_def = result_store.get_model_definition(cat_id)
+
+        summaries.append(
+            DashboardCategorySummary(
+                category_id=cat_id,
+                category_path=cat_path,
+                trend=TrendResultResponse(
+                    slope=trend.slope,
+                    intercept=trend.intercept,
+                    is_warning=trend.is_warning,
+                )
+                if trend
+                else None,
+                anomaly_count=len(anomalies),
+                baseline_status="configured"
+                if model_def is not None
+                else "unconfigured",
+            )
+        )
+
+    return {"categories": summaries}
+
+
+# ---------- SSE ----------
+
+
+@app.get("/api/events")
+async def events(bus: EventBusDep):
+    """Server-Sent Events ストリーム。ダッシュボード更新通知を配信する。"""
+
+    async def stream_with_keepalive():
+        async with bus.subscribe() as queue:
+            while True:
+                try:
+                    event = await asyncio.wait_for(queue.get(), timeout=30)
+                    yield (
+                        f"event: {event['event']}\n"
+                        f"data: {json.dumps(event.get('data') or {})}\n\n"
+                    )
+                except TimeoutError:
+                    yield ": keepalive\n\n"
+
+    return StreamingResponse(
+        stream_with_keepalive(), media_type="text/event-stream"
+    )
 
 
 # ---------- デバッグ用エンドポイント ----------

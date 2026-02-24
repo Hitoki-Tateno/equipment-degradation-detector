@@ -45,6 +45,15 @@ const client = axios.create({ baseURL: '/api' });
  */
 
 /**
+ * @typedef {Object} DashboardCategorySummary
+ * @property {number} category_id
+ * @property {string} category_path
+ * @property {TrendResult|null} trend
+ * @property {number} anomaly_count
+ * @property {string} baseline_status - "configured" | "unconfigured"
+ */
+
+/**
  * GET /api/categories
  * @param {number} [rootId] - ルートカテゴリID（省略時は全ツリー）
  * @returns {Promise<CategoryNode[]>}
@@ -114,6 +123,15 @@ export async function saveBaselineConfig(categoryId, config) {
 export async function deleteBaselineConfig(categoryId) {
   const { data } = await client.delete(`/models/${categoryId}`);
   return data;
+}
+
+/**
+ * GET /api/dashboard/summary
+ * @returns {Promise<DashboardCategorySummary[]>}
+ */
+export async function fetchDashboardSummary() {
+  const { data } = await client.get('/dashboard/summary');
+  return data.categories;
 }
 
 /**

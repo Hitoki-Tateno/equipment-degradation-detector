@@ -114,3 +114,50 @@
   - モデル定義済みのカテゴリには異常検知も実行
   - ダッシュボードの「分析実行」ボタンから呼び出す
 ```
+
+## GET /api/dashboard/summary（ダッシュボードバッチAPI）
+
+```
+レスポンス:
+  {
+    "categories": [
+      {
+        "category_id": 1,
+        "category_path": "大分類 > 中分類",
+        "trend": { "slope": 0.05, "intercept": 10.0, "is_warning": false },
+        "anomaly_count": 3,
+        "baseline_status": "configured"
+      },
+      {
+        "category_id": 2,
+        "category_path": "大分類 > 別分類",
+        "trend": null,
+        "anomaly_count": 0,
+        "baseline_status": "unconfigured"
+      }
+    ]
+  }
+
+振る舞い:
+  - 全リーフカテゴリのサマリーを一括返却（中間ノードは含まない）
+  - category_path はサーバー側で " > " 区切りで組み立て
+  - trend は未計算なら null
+  - anomaly_count は異常スコアの件数（リスト全体ではなく件数のみ）
+  - baseline_status は "configured"（モデル定義あり）/ "unconfigured"（なし）
+```
+
+## GET /api/events（SSEストリーム）
+
+```
+Content-Type: text/event-stream
+
+イベント形式:
+  event: dashboard-updated
+  data: {}
+
+振る舞い:
+  - Server-Sent Events ストリーム
+  - データ変更エンドポイント（POST /api/records, PUT/DELETE /api/models, POST /api/analysis/run）の完了後に dashboard-updated イベントを配信
+  - 30秒間隔で keepalive コメント（": keepalive\n\n"）を送信し、プロキシによるコネクション切断を防止
+  - フロントエンドの EventSource API で購読
+```
