@@ -48,14 +48,9 @@ function WorkTimePlot({
     graphDivRef.current = graphDiv;
   }, []);
 
-  // モード切替時の命令的更新
+  // 操作モードに切り替わった際にPlotlyの選択ハイライトを強制クリア
   useEffect(() => {
-    if (!graphDivRef.current) return;
-    if (interactionMode === 'select') {
-      // scattergl は dragmode:'select' 時のみ stash.xpx/ypx を計算する。
-      // layout だけの更新では plot 関数が再実行されないため、強制再描画で再計算させる。
-      Plotly.redraw(graphDivRef.current);
-    } else {
+    if (interactionMode !== 'select' && graphDivRef.current) {
       Plotly.restyle(graphDivRef.current, { selectedpoints: [null] }, [0]);
     }
   }, [interactionMode]);
@@ -176,6 +171,10 @@ function WorkTimePlot({
       dragmode: interactionMode === 'select' ? 'select' : 'zoom',
       selectdirection: interactionMode === 'select' ? 'h' : undefined,
       selections: interactionMode === 'select' ? undefined : [],
+      // scattergl は dragmode:'select' 時のみ stash.xpx/ypx を計算する（plot.js:275-305）。
+      // dragmode 変更だけでは editType:'modebar' のため plot 関数が再実行されない。
+      // datarevision (editType:'calc') を連動させ、Plotly.react 内で同期的に recalc+replot を強制する。
+      datarevision: interactionMode,
       uirevision: categoryId,
       xaxis: {
         title: '記録日時',
