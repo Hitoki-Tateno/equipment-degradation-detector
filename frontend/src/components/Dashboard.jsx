@@ -58,8 +58,8 @@ function Dashboard({ active, categories, onNavigateToPlot }) {
   }, []);
 
   useEffect(() => {
-    if (active) loadDashboardData();
-  }, [active, loadDashboardData]);
+    if (active && categories && categories.length > 0) loadDashboardData();
+  }, [active, categories, loadDashboardData]);
 
   const handleRunAnalysis = async () => {
     setAnalysisRunning(true);
