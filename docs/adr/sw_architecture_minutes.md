@@ -291,4 +291,66 @@ POST /api/analysis/run
 
 ---
 
-*最終更新: 2026-02-20*
+## リアルタイム通知とダッシュボード最適化（Issue #75）
+
+### 課題
+
+ダッシュボードのタブ切替時に、全リーフカテゴリに対して 2N リクエスト（`GET /api/results/{id}` × N + `GET /api/models/{id}` × N）が発生し、体感で遅い。さらに、データは設備から動的に注入される（`POST /api/records`）ため、ユーザー操作とは無関係にバックエンド側でデータが更新される。ダッシュボードはこれを検知する手段がなかった。
+
+### 採用方式: バッチAPI + SSE（Server-Sent Events）
+
+| 最適化 | 効果 |
+|--------|------|
+| **バッチAPI** `GET /api/dashboard/summary` | 2N → 1 リクエストに集約。全リーフカテゴリのサマリーを一括返却 |
+| **SSE** `GET /api/events` | バックエンドの全データ変更をリアルタイムにフロントへ通知 |
+
+**検討した代替案と棄却理由：**
+
+| 案 | 評価 |
+|---|---|
+| ダーティフラグ（フロント完結） | ユーザー操作の変更しか追跡できず、バックエンドからのデータ注入を検知できない。不採用 |
+| WebSocket | 双方向通信は不要。SSEの方が軽量でHTTP/1.1で動作するため過剰。不採用 |
+| ポーリング + バージョン番号 | インターバル分の遅延がある。SSEであればリアルタイム通知が可能で実装の複雑さも同程度。不採用 |
+
+### EventBus 設計
+
+単一プロセス（uvicorn）前提で `asyncio.Queue` ベースのインメモリ pub/sub を採用:
+
+- `backend/ingestion/event_bus.py` にモジュールレベルの `EventBus` クラスを定義
+- `backend/dependencies.py` で DI 経由（`get_event_bus()`）でシングルトン注入
+- データ変更エンドポイント（`POST /api/records`, `PUT/DELETE /api/models`, `POST /api/analysis/run`）の処理完了後に `bus.publish("dashboard-updated")` を呼び出し
+- SSE エンドポイント `GET /api/events` が subscribe し、`text/event-stream` でフロントに中継
+- 30秒間隔の keepalive コメントでプロキシによるコネクション切断を防止
+
+**ResultStoreInterface は変更しない。** バッチAPI のエンドポイント内で既存メソッドをループ呼び出しする。ダッシュボードサマリーは表示層の関心事であり、ドメインインターフェースに持ち込まない。SQLite は同プロセス内アクセスなのでループのオーバーヘッドは許容範囲。
+
+### フロントエンド連携
+
+- Dashboard コンポーネントは常時マウント（Issue #51 で採用済みの設計）のため、SSE 接続が維持される
+- SSE `dashboard-updated` イベント受信時: アクティブなら 2秒デバウンスで `fetchDashboardSummary()` を呼び出し、非アクティブなら stale フラグを立て復帰時に再取得
+- PlotView / useBaselineManager は変更不要（PlotView での save/delete もバックエンド経由で SSE 通知が発火する）
+
+### ダッシュボードAPI
+
+```
+GET /api/dashboard/summary
+  出力: {
+    categories: [{
+      category_id: 1,
+      category_path: "大分類 > 中分類",
+      trend: { slope, intercept, is_warning } | null,
+      anomaly_count: 3,
+      baseline_status: "configured" | "unconfigured"
+    }, ...]
+  }
+  備考: 全リーフカテゴリのサマリーを一括返却
+
+GET /api/events
+  Content-Type: text/event-stream
+  イベント: dashboard-updated
+  備考: SSEストリーム。データ変更時に通知を配信。30秒間隔でkeepalive
+```
+
+---
+
+*最終更新: 2026-02-24*

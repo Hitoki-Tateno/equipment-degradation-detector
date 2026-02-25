@@ -10,8 +10,10 @@ from backend.dependencies import (
     _reset_all,
     get_analysis_engine,
     get_data_store,
+    get_event_bus,
     get_result_store,
 )
+from backend.ingestion.event_bus import EventBus
 from backend.ingestion.main import app
 from backend.result_store.sqlite import SqliteResultStore
 from backend.store.sqlite import SqliteDataStore
@@ -23,10 +25,12 @@ def _override_deps(tmp_path):
     data_store = SqliteDataStore(str(tmp_path / "store.db"))
     result_store = SqliteResultStore(str(tmp_path / "result.db"))
     engine = AnalysisEngine(data_store, result_store)
+    event_bus = EventBus()
 
     app.dependency_overrides[get_data_store] = lambda: data_store
     app.dependency_overrides[get_result_store] = lambda: result_store
     app.dependency_overrides[get_analysis_engine] = lambda: engine
+    app.dependency_overrides[get_event_bus] = lambda: event_bus
 
     yield
 
@@ -444,3 +448,152 @@ class TestTimezoneAwareDatetimes:
         results = client.get(f"/api/results/{leaf_id}")
         assert results.status_code == 200
         assert len(results.json()["anomalies"]) == 2
+
+
+class TestDashboardSummary:
+    """GET /api/dashboard/summary — ダッシュボード一括取得。"""
+
+    def test_empty_returns_empty_list(self, client):
+        """データなし → 空リスト。"""
+        resp = client.get("/api/dashboard/summary")
+        assert resp.status_code == 200
+        assert resp.json()["categories"] == []
+
+    def test_returns_all_leaf_categories(self, client):
+        """複数カテゴリ → 全末端カテゴリのサマリーを返す。"""
+        client.post(
+            "/api/records",
+            json={
+                "records": [
+                    {
+                        "category_path": ["A", "X"],
+                        "work_time": 10.0,
+                        "recorded_at": "2025-01-01T00:00:00",
+                    },
+                    {
+                        "category_path": ["A", "Y"],
+                        "work_time": 20.0,
+                        "recorded_at": "2025-01-01T00:00:00",
+                    },
+                ]
+            },
+        )
+        resp = client.get("/api/dashboard/summary")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data["categories"]) == 2
+        paths = {c["category_path"] for c in data["categories"]}
+        assert "A > X" in paths
+        assert "A > Y" in paths
+
+    def test_includes_trend_data(self, client):
+        """トレンド分析結果がサマリーに含まれる。"""
+        client.post(
+            "/api/records",
+            json={
+                "records": [
+                    {
+                        "category_path": ["P", "E"],
+                        "work_time": 10.0,
+                        "recorded_at": "2025-01-01T00:00:00",
+                    },
+                    {
+                        "category_path": ["P", "E"],
+                        "work_time": 20.0,
+                        "recorded_at": "2025-02-01T00:00:00",
+                    },
+                ]
+            },
+        )
+        resp = client.get("/api/dashboard/summary")
+        cat = resp.json()["categories"][0]
+        assert cat["trend"] is not None
+        assert "slope" in cat["trend"]
+        assert "intercept" in cat["trend"]
+        assert "is_warning" in cat["trend"]
+
+    def test_baseline_status_configured(self, client):
+        """モデル定義済み → baseline_status = "configured"。"""
+        client.post(
+            "/api/records",
+            json={
+                "records": [
+                    {
+                        "category_path": ["P", "E"],
+                        "work_time": 10.0,
+                        "recorded_at": "2025-01-01T00:00:00",
+                    },
+                    {
+                        "category_path": ["P", "E"],
+                        "work_time": 10.5,
+                        "recorded_at": "2025-02-01T00:00:00",
+                    },
+                ]
+            },
+        )
+        tree = client.get("/api/categories")
+        leaf_id = tree.json()["categories"][0]["children"][0]["id"]
+
+        client.put(
+            f"/api/models/{leaf_id}",
+            json={
+                "baseline_start": "2025-01-01T00:00:00",
+                "baseline_end": "2025-12-31T00:00:00",
+                "sensitivity": 0.5,
+                "excluded_points": [],
+            },
+        )
+
+        resp = client.get("/api/dashboard/summary")
+        cat = next(
+            c for c in resp.json()["categories"] if c["category_id"] == leaf_id
+        )
+        assert cat["baseline_status"] == "configured"
+        assert isinstance(cat["anomaly_count"], int)
+        assert cat["anomaly_count"] >= 0
+
+    def test_baseline_status_unconfigured(self, client):
+        """モデル未定義 → baseline_status = "unconfigured"。"""
+        client.post(
+            "/api/records",
+            json={
+                "records": [
+                    {
+                        "category_path": ["Q", "F"],
+                        "work_time": 10.0,
+                        "recorded_at": "2025-01-01T00:00:00",
+                    },
+                ]
+            },
+        )
+        resp = client.get("/api/dashboard/summary")
+        cat = resp.json()["categories"][0]
+        assert cat["baseline_status"] == "unconfigured"
+        assert cat["anomaly_count"] == 0
+
+    def test_non_leaf_categories_excluded(self, client):
+        """中間ノードはサマリーに含まれない。"""
+        client.post(
+            "/api/records",
+            json={
+                "records": [
+                    {
+                        "category_path": ["Root", "Mid", "Leaf1"],
+                        "work_time": 10.0,
+                        "recorded_at": "2025-01-01T00:00:00",
+                    },
+                    {
+                        "category_path": ["Root", "Mid", "Leaf2"],
+                        "work_time": 20.0,
+                        "recorded_at": "2025-01-01T00:00:00",
+                    },
+                ]
+            },
+        )
+        resp = client.get("/api/dashboard/summary")
+        cats = resp.json()["categories"]
+        # Root, Mid は中間ノード → 含まれない。Leaf1, Leaf2 のみ。
+        assert len(cats) == 2
+        paths = {c["category_path"] for c in cats}
+        assert "Root > Mid > Leaf1" in paths
+        assert "Root > Mid > Leaf2" in paths
