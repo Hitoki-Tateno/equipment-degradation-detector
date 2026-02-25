@@ -7,64 +7,55 @@
 
 | # | 変更 | 方針 |
 |---|------|------|
-| 1 | トレンド分析の簡素化 | バックエンド計算を廃止 → Plotly.jsフロントエンドOLSに移行 |
+| 1 | トレンド分析の簡素化 | バックエンド計算は維持、WARNING_THRESHOLD/is_warning廃止、ダッシュボード表示削除 |
 | 2 | 異常値通知の刷新 | ポイント色分け廃止 → 異常スコアサブチャート + 動的閾値ライン |
-| 3 | 特徴量アセットシステム | 8種の特徴量ビルダー + ユーザー選択UI + チュートリアルページ |
+| 3 | 特徴量アセットシステム | 複数特徴量を組み合わせ可能なアーキテクチャ + ユーザー選択UI + チュートリアルページ（具体的な特徴量は今後選定） |
 
 ---
 
-## Step 1: トレンド分析の簡素化
+## Step 1: トレンド分析の簡素化（判定ロジック廃止、描画特化）
 
-Plotly.jsにはPython版のような `trendline='ols'` オプションがないため、フロントエンドでOLS計算を行いtraceとして追加する。
+**方針**: バックエンドの回帰計算・永続化・APIは維持する。WARNING_THRESHOLD/is_warning判定ロジックを廃止し、slope/interceptをAPIで返してフロントエンドで描画するだけのシンプルな構成にする。ダッシュボードへのトレンド表示は不要。
 
-### 1-1. バックエンド: インターフェースからTrend削除
-
-| ファイル | 変更内容 |
-|----------|----------|
-| `backend/interfaces/result_store.py` | `TrendResult` dataclass、`save_trend_result()`、`get_trend_result()` を削除 |
-| `backend/result_store/sqlite.py` | `trend_results`テーブル・関連メソッド削除、`DROP TABLE IF EXISTS trend_results` マイグレーション追加 |
-| `backend/analysis/trend.py` | **ファイル丸ごと削除** |
-| `backend/analysis/engine.py` | `run()` からトレンド計算部分を削除 |
-
-### 1-2. API: Trend関連レスポンス削除
+### 1-1. バックエンド: 判定ロジック削除
 
 | ファイル | 変更内容 |
 |----------|----------|
-| `backend/ingestion/main.py` | `TrendResultResponse` モデル削除 |
-| 同上 | `GET /api/results/{category_id}` レスポンスから`trend`フィールド削除 |
-| 同上 | `GET /api/dashboard/summary` の `DashboardCategorySummary` から`trend`フィールド削除 |
+| `backend/analysis/trend.py` | `WARNING_THRESHOLD` 定数を削除、`compute_trend()` の戻り値から `is_warning` を除去し `(slope, intercept)` のみ返す |
+| `backend/interfaces/result_store.py` | `TrendResult` dataclassから `is_warning` フィールドを削除 |
+| `backend/result_store/sqlite.py` | `trend_results` テーブルの `is_warning` 列を削除 |
+| `backend/analysis/engine.py` | `TrendResult` 構築時の `is_warning` 引数を削除 |
 
-### 1-3. フロントエンド: OLS計算をWorkTimePlotに移動
+### 1-2. API: ダッシュボードからトレンド除去
 
 | ファイル | 変更内容 |
 |----------|----------|
-| `frontend/src/components/WorkTimePlot.jsx` | `trend` prop削除、`useMemo`でOLS回帰をJS内で計算、トレンドtrace描画は維持（赤い点線） |
-| `frontend/src/hooks/useBaselineManager.js` | state・dispatchからtrend関連を全削除 |
-| `frontend/src/components/PlotView.jsx` | trend propの受け渡し削除 |
+| `backend/ingestion/main.py` | `TrendResultResponse` から `is_warning` フィールドを削除（slope/interceptは維持） |
+| 同上 | `GET /api/results/{category_id}`: `trend` フィールドは維持（slope/interceptのみ） |
+| 同上 | `GET /api/dashboard/summary`: `DashboardCategorySummary` から `trend` フィールドを削除 |
+
+### 1-3. フロントエンド: ダッシュボード列削除、プロット描画は維持
+
+| ファイル | 変更内容 |
+|----------|----------|
 | `frontend/src/components/Dashboard.jsx` | 「トレンド警告」「傾き(slope)」列を削除、「異常検出数」列を追加 |
-| `frontend/src/services/api.js` | TrendResult typedef削除 |
-
-**OLS計算（JavaScript）**:
-```javascript
-// xValues=[1,2,...,n], yValues=work_times
-const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
-const intercept = (sumY - slope * sumX) / n;
-```
+| `frontend/src/components/WorkTimePlot.jsx` | 変更なし（APIからslope/interceptを受けて赤い点線を描画する現行の仕組みを維持） |
+| `frontend/src/hooks/useBaselineManager.js` | trend stateは維持（APIレスポンスを受け渡すのみ） |
+| `frontend/src/services/api.js` | TrendResult typedefから `is_warning` を削除 |
 
 ### 1-4. テスト修正
 
 | ファイル | 変更内容 |
 |----------|----------|
-| `tests/unit/test_analysis_engine.py` | `TestComputeTrend` クラス削除、エンジンテストからtrend assertion削除 |
-| `tests/unit/test_result_store_contract.py` | `TestTrendResults` クラス削除 |
-| `tests/integration/test_analysis_flow.py` | trend関連assertion更新 |
+| `tests/unit/test_analysis_engine.py` | `TestComputeTrend` の `is_warning` 関連テストを削除・修正 |
+| `tests/unit/test_result_store_contract.py` | `TestTrendResults` から `is_warning` assertionを削除 |
+| `tests/integration/test_analysis_flow.py` | `is_warning` 関連assertionを削除 |
 
 ### 1-5. スキルドキュメント更新
 
 - `.claude/skills/analysis-engine/references/analysis-flow.md`
 - `.claude/skills/sqlite-store/references/schema.md`
 - `.claude/skills/fastapi-api/references/endpoints.md`
-- `.claude/skills/react-plotly/references/interactive-plots.md`
 - `.claude/skills/contract-tdd/references/result-store-contract.md`
 
 ---
@@ -112,6 +103,34 @@ yaxis2: { domain: [0.0, 0.23], range: [0, 1.05], anchor: 'x' } // サブチャ�
 
 ## Step 3: 特徴量アセットシステム
 
+**注意**: 具体的な特徴量の選定は今後行う。ここではアーキテクチャ（仕組み）の方向性のみ定める。
+
+### ユーザージャーニー
+
+```
+[1. チュートリアルで学ぶ]
+   チュートリアルページ → 各特徴量の説明・サンプルデータで効果を確認
+                          → 「この特徴量はこういう場面で有効」を理解
+                                    ↓
+[2. プロットで適用]
+   プロットページ → カテゴリ選択 → ベースライン範囲をドラッグ選択
+                  → BaselineControlsパネル内で:
+                      ・感度スライダー（既存）
+                      ・特徴量チェックボックス（新規）← ベースライン設定と同じパネル
+                      ・パラメータ入力（該当する特徴量のみ展開）
+                  → 「設定を保存」ボタンで一括保存
+                                    ↓
+[3. 結果を確認]
+   バックエンド再分析 → 異常スコアサブチャートが更新
+                      → 特徴量の効果を異常スコアの変化で判断
+                      → 必要に応じて特徴量を変更して再保存
+```
+
+**ポイント**:
+- 特徴量のプレビューAPIは不要（チュートリアルはサンプルデータ、プロットは保存後の結果で確認）
+- ベースライン設定と特徴量選択は同じ「保存」アクションで一括送信
+- チュートリアルは学習用、プロットは実践用という明確な役割分担
+
 ### 3-1. バックエンドインターフェース拡張
 
 | ファイル | 変更内容 |
@@ -120,24 +139,17 @@ yaxis2: { domain: [0.0, 0.23], range: [0, 1.05], anchor: 'x' } // サブチャ�
 | 同上 | `FeatureSpec(feature_type: str, params: dict)` dataclass追加 |
 | 同上 | `FeatureConfig(features: list[FeatureSpec])` dataclass追加 |
 
-### 3-2. 8種の特徴量ビルダー実装
+### 3-2. 特徴量ビルダーの追加
 
 `backend/analysis/feature.py` に追加:
-
-| ビルダー | 出力次元 | パラメータ | timestamps必要 |
-|----------|---------|-----------|---------------|
-| `RawWorkTimeFeatureBuilder`（既存） | (n, 1) | なし | No |
-| `MovingAverageFeatureBuilder` | (n, 1) | window: int | No |
-| `MovingStdFeatureBuilder` | (n, 1) | window: int | No |
-| `RateOfChangeFeatureBuilder` | (n, 1) | なし | No |
-| `LagFeatureBuilder` | (n, len(lags)) | lags: list[int] | No |
-| `DifferenceFeatureBuilder` | (n, 1) | なし | No |
-| `DayOfWeekFeatureBuilder` | (n, 2) | なし | Yes |
-| `HourOfDayFeatureBuilder` | (n, 2) | なし | Yes |
-
-追加クラス:
-- `CompositeFeatureBuilder`: 複数ビルダーを `np.hstack` で結合
+- 個別の特徴量ビルダークラス（具体的な種類・数は今後選定）
+- `CompositeFeatureBuilder`: 複数ビルダーを `np.hstack` で結合し、ユーザーが自由に組み合わせ可能にする
 - `FEATURE_REGISTRY` dict + `create_feature_builder(config)` ファクトリ関数
+
+**特徴量の候補例**（確定ではない、今後の選定で決定）:
+- 時系列統計量系: 移動平均、移動標準偏差、変化率、差分、ラグ特徴量 等
+- 時間情報系: 曜日エンコーディング、時刻エンコーディング 等
+- その他、ドメイン知識に基づく特徴量
 
 ### 3-3. ModelDefinition拡張
 
@@ -152,25 +164,24 @@ yaxis2: { domain: [0.0, 0.23], range: [0, 1.05], anchor: 'x' } // サブチャ�
 |----------|----------|
 | `backend/analysis/engine.py` | `model_def.feature_config` で動的ビルダー生成、timestampsもビルダーに渡す |
 
-### 3-5. API追加・変更
+### 3-5. API変更
 
 | エンドポイント | 変更内容 |
 |----------------|----------|
-| `PUT /api/models/{category_id}` | リクエストに `feature_config` フィールド追加 |
+| `PUT /api/models/{category_id}` | リクエストに `feature_config` フィールド追加（ベースライン設定と一括送信） |
 | `GET /api/models/{category_id}` | レスポンスに `feature_config` フィールド追加 |
 | **新規** `GET /api/features/registry` | 利用可能な特徴量一覧（型、ラベル、パラメータスキーマ、説明） |
-| **新規** `GET /api/features/preview` | 指定特徴量でカテゴリデータを変換してプレビュー返却 |
 
-### 3-6. フロントエンド: 特徴量選択UI
+### 3-6. フロントエンド: 特徴量選択UI（BaselineControlsに統合）
 
 | ファイル | 変更内容 |
 |----------|----------|
 | **新規** `frontend/src/components/FeatureSelector.jsx` | Checkbox.Group で特徴量チェックボックス選択 + パラメータ入力 |
-| `frontend/src/components/BaselineControls.jsx` | `FeatureSelector` をCollapse内に配置 |
-| `frontend/src/hooks/useBaselineManager.js` | `featureConfig` state追加、save時にAPIへ送信 |
-| `frontend/src/services/api.js` | `fetchFeatureRegistry()`, `fetchFeaturePreview()` 追加 |
+| `frontend/src/components/BaselineControls.jsx` | 既存の感度スライダーの下に `FeatureSelector` を配置 |
+| `frontend/src/hooks/useBaselineManager.js` | `featureConfig` state追加、save時に既存のベースライン設定と一緒にAPIへ送信 |
+| `frontend/src/services/api.js` | `fetchFeatureRegistry()` 追加 |
 
-### 3-7. フロントエンド: チュートリアルページ
+### 3-7. フロントエンド: チュートリアルページ（学習専用）
 
 | ファイル | 変更内容 |
 |----------|----------|
@@ -185,16 +196,11 @@ yaxis2: { domain: [0.0, 0.23], range: [0, 1.05], anchor: 'x' } // サブチャ�
 | **新規** `tests/unit/test_feature_builders.py` | 各ビルダーの入出力、CompositeBuilder、ファクトリ |
 | `tests/unit/test_result_store_contract.py` | feature_config付きModelDefinitionの保存・読込テスト |
 | `tests/unit/test_analysis_engine.py` | feature_config利用時のengine.run()テスト |
-| `tests/integration/test_analysis_flow.py` | registry/previewエンドポイントテスト |
+| `tests/integration/test_analysis_flow.py` | registryエンドポイント、feature_config付きモデル保存のテスト |
 
 ---
 
 ## ファイル影響一覧
-
-### 削除
-| ファイル | 理由 |
-|----------|------|
-| `backend/analysis/trend.py` | トレンド計算をフロントエンドへ移行 |
 
 ### 新規作成
 | ファイル | 内容 |
@@ -208,17 +214,18 @@ yaxis2: { domain: [0.0, 0.23], range: [0, 1.05], anchor: 'x' } // サブチャ�
 ### 主要変更
 | ファイル | 変更内容 |
 |----------|----------|
-| `backend/interfaces/result_store.py` | TrendResult削除、ModelDefinitionにfeature_config追加 |
+| `backend/analysis/trend.py` | WARNING_THRESHOLD削除、compute_trend()からis_warning除去 |
+| `backend/interfaces/result_store.py` | TrendResultからis_warning削除、ModelDefinitionにfeature_config追加 |
 | `backend/interfaces/feature.py` | timestamps引数追加、FeatureSpec/FeatureConfig追加 |
-| `backend/analysis/feature.py` | 7種ビルダー + Composite + Registry + Factory追加 |
-| `backend/analysis/engine.py` | trend計算削除、feature_config対応 |
-| `backend/result_store/sqlite.py` | trend_results削除、feature_config列追加 |
-| `backend/ingestion/main.py` | trend API削除、feature系API追加 |
-| `frontend/src/components/WorkTimePlot.jsx` | OLS計算追加、色分け廃止、サブチャート追加 |
-| `frontend/src/components/Dashboard.jsx` | trend列→異常検出数列 |
+| `backend/analysis/feature.py` | 特徴量ビルダー群 + Composite + Registry + Factory追加 |
+| `backend/analysis/engine.py` | is_warning除去、feature_config対応 |
+| `backend/result_store/sqlite.py` | trend_resultsからis_warning列削除、feature_config列追加 |
+| `backend/ingestion/main.py` | TrendResultResponseからis_warning削除、ダッシュボードからtrend除去、feature系API追加 |
+| `frontend/src/components/WorkTimePlot.jsx` | 色分け廃止、サブチャート追加（トレンド描画は維持） |
+| `frontend/src/components/Dashboard.jsx` | trend列削除→異常検出数列追加 |
 | `frontend/src/components/BaselineControls.jsx` | FeatureSelector統合 |
-| `frontend/src/hooks/useBaselineManager.js` | trend削除、featureConfig追加 |
-| `frontend/src/services/api.js` | trend型削除、feature系API追加 |
+| `frontend/src/hooks/useBaselineManager.js` | featureConfig追加 |
+| `frontend/src/services/api.js` | TrendResultからis_warning削除、fetchFeatureRegistry()追加 |
 | `frontend/src/App.js` | チュートリアルビュー追加 |
 
 ---
@@ -248,7 +255,7 @@ cd frontend && npm run build
 2. フロントエンド起動: `cd frontend && npm start`
 3. CSVデータをアップロード
 4. ダッシュボード: 「異常検出数」列が表示されること
-5. プロット: トレンド直線（赤点線）が表示されること（フロントエンドOLS）
+5. プロット: トレンド直線（赤点線）が表示されること（バックエンドAPIからslope/interceptを取得して描画）
 6. ベースライン設定後: サブチャートに異常スコアが表示されること
 7. 感度スライダー操作: 閾値ラインがリアルタイムで移動すること
 8. 特徴量選択: チェックボックスで特徴量を変更→保存→再分析されること

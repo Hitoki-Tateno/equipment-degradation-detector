@@ -8,10 +8,10 @@
 
 Step 1（データ可視化）完了後、Step 2（モデル定義）の実装過程で以下の課題が明確になった。
 
-### 課題1: トレンド分析の過剰実装
-- LinearRegressionをバックエンドで計算し、DB保存・API配信・フロントエンド描画するフルスタックパイプラインが存在
-- 実際のユーザー価値は「プロット上の回帰直線」だけであり、バックエンドでの計算・保存は不要
+### 課題1: トレンド分析の判定ロジックの冗長性
 - WARNING_THRESHOLD(0.5)のハードコード判定は、異常検知（IsolationForest）と役割が重複
+- ダッシュボードの「トレンド警告」列は異常検知が導入された現在、実質的に不要
+- バックエンドの回帰計算・永続化・API配信の仕組み自体は、プロット描画に必要なため維持する
 
 ### 課題2: 異常値通知のUX問題
 - 散布図のポイント色分け（青→赤）による通知は、数値的な重大度が伝わらない
@@ -25,25 +25,21 @@ Step 1（データ可視化）完了後、Step 2（モデル定義）の実装�
 
 ## 決定事項
 
-### 決定1: トレンド直線のフロントエンド移行
+### 決定1: トレンド分析の簡素化（判定ロジック廃止、描画特化）
 
-**方針**: バックエンドのトレンド分析パイプラインを全廃し、Plotly.js上でOLS回帰をフロントエンド計算する。
+**方針**: バックエンドの回帰計算・永続化・APIは維持する。WARNING_THRESHOLD/is_warning判定ロジックを廃止し、slope/interceptをAPIで返してフロントエンドで描画するだけのシンプルな構成にする。ダッシュボードへのトレンド表示は不要。
 
 **理由**:
-- トレンド直線の描画はプレゼンテーション層の責務
-- バックエンドの計算・保存・配信の3層が不要になり、コードベースが大幅に簡素化
+- 回帰計算はバックエンドの責務として維持（フロントエンドに計算ロジックを持たせない）
 - WARNING_THRESHOLDの判定は異常検知に統合することで役割の重複を解消
+- ダッシュボードからトレンド列を削除し、異常検出数で代替
 
-**削除対象**:
-- `backend/analysis/trend.py`（ファイル削除）
-- `TrendResult` dataclass、`save/get_trend_result()` インターフェース
-- `trend_results` SQLiteテーブル
-- API: `TrendResultResponse`、レスポンスの`trend`フィールド
-- Dashboard: トレンド警告・傾き列
-
-**追加対象**:
-- `WorkTimePlot.jsx` 内でのJavaScript OLS計算（useMemoで最適化）
-- Dashboard: 「異常検出数」列（anomalyCountのTag色分け表示）
+**変更対象**:
+- `TrendResult` dataclass: `is_warning` フィールドを削除（slope/interceptは維持）
+- `compute_trend()`: `WARNING_THRESHOLD` 定数を削除、戻り値から `is_warning` を除去
+- `trend_results` テーブル: `is_warning` 列を削除
+- API: `TrendResultResponse` から `is_warning` を削除
+- Dashboard: トレンド警告・傾き列を削除、「異常検出数」列を追加
 
 ### 決定2: 異常スコアサブチャートによる数値通知
 
@@ -75,45 +71,60 @@ Step 1（データ可視化）完了後、Step 2（モデル定義）の実装�
 
 ### 決定3: 特徴量アセットシステム
 
-**方針**: 8種の特徴量ビルダーを提供し、ユーザーがチェックボックスで自由に組み合わせ可能にする。選択された特徴量はModelDefinitionの一部として永続化し、分析実行時に動的にCompositeFeatureBuilderを構成する。
+**方針**: 複数の特徴量ビルダーを提供し、ユーザーがチェックボックスで自由に組み合わせ可能にする。選択された特徴量はModelDefinitionの一部として永続化し、分析実行時に動的にCompositeFeatureBuilderを構成する。具体的な特徴量の種類・数は今後選定する。
 
-**特徴量一覧**:
-
-| 特徴量 | 説明 | パラメータ |
-|--------|------|-----------|
-| 生値 | 作業時間をそのまま使用 | なし |
-| 移動平均 | 直近N回の平均 | window |
-| 移動標準偏差 | 直近N回のばらつき | window |
-| 変化率 | (今回-前回)/前回 | なし |
-| ラグ特徴量 | t-1, t-2等の過去データ | lags |
-| 差分 | 今回-前回（1階差分） | なし |
-| 曜日エンコーディング | sin/cosによる周期表現 | なし |
-| 時刻エンコーディング | sin/cosによる周期表現 | なし |
+**特徴量の候補例**（確定ではない、今後の選定で決定）:
+- 時系列統計量系: 移動平均、移動標準偏差、変化率、差分、ラグ特徴量 等
+- 時間情報系: 曜日エンコーディング、時刻エンコーディング 等
+- その他、ドメイン知識に基づく特徴量
 
 **アーキテクチャ**:
 - `FeatureBuilder.build()` に `timestamps` 引数を追加（後方互換: デフォルトNone）
 - `FeatureConfig` / `FeatureSpec` dataclassでユーザー設定を型安全に表現
 - `FEATURE_REGISTRY` dictと `create_feature_builder()` ファクトリで動的構築
+- `CompositeFeatureBuilder` で複数特徴量を `np.hstack` で結合
 - `ModelDefinition.feature_config` に永続化（SQLiteのJSON列）
 - AnalysisEngineが `model_def.feature_config` を参照して特徴量ビルダーを動的生成
+
+**ユーザージャーニー**:
+```
+[1. チュートリアルで学ぶ]
+   チュートリアルページ → 各特徴量の説明・サンプルデータで効果を確認
+                          → 「この特徴量はこういう場面で有効」を理解
+                                    ↓
+[2. プロットで適用]
+   プロットページ → カテゴリ選択 → ベースライン範囲をドラッグ選択
+                  → BaselineControlsパネル内で:
+                      ・感度スライダー（既存）
+                      ・特徴量チェックボックス（新規）
+                      ・パラメータ入力（該当する特徴量のみ展開）
+                  → 「設定を保存」ボタンで一括保存
+                                    ↓
+[3. 結果を確認]
+   バックエンド再分析 → 異常スコアサブチャートが更新
+                      → 特徴量の効果を異常スコアの変化で判断
+                      → 必要に応じて特徴量を変更して再保存
+```
 
 **チュートリアルページ**:
 - フロントエンドに「チュートリアル」ビューを新設
 - 各特徴量の説明 + プリコンピュートしたサンプルデータでの変換前後をPlotlyミニチャートで可視化
-- 「いつ使うか」のガイダンステキスト付き
+- 「いつ使うか」「どういうデータに有効か」のガイダンステキスト付き
+- プレビューAPIは不要（チュートリアルは学習用、プロットは実践用）
 
 **理由**:
 - FeatureBuilder ABCの設計意図（拡張可能な特徴量エンジニアリング）を実現
 - Composite Patternによる自由な組み合わせで、ユーザーが分析精度を自己最適化可能
 - チュートリアルページにより、ML知識が限定的なユーザーでも特徴量を理解して選択可能
+- ベースライン設定と特徴量選択を同じパネル・同じ保存アクションで行うことで操作の一貫性を確保
 
 ## 影響範囲
 
 ### 破壊的変更
-- `ResultStoreInterface`: TrendResult関連メソッド削除
+- `TrendResult`: `is_warning` フィールド削除
 - `FeatureBuilder`: build()シグネチャ変更（後方互換あり）
-- API: `GET /api/results/{id}` と `GET /api/dashboard/summary` のレスポンス形式変更
-- DB: `trend_results` テーブル削除、`model_definitions` に列追加
+- API: `GET /api/dashboard/summary` のレスポンスから `trend` 削除
+- DB: `trend_results` の `is_warning` 列削除、`model_definitions` に `feature_config` 列追加
 
 ### 依存ルール
 変更後も以下を維持する（`test_dependency_rules.py` で強制）:
@@ -125,6 +136,5 @@ Step 1（データ可視化）完了後、Step 2（モデル定義）の実装�
 | リスク | 影響度 | 緩和策 |
 |--------|--------|--------|
 | Plotly.js gl2d-distでサブプロットが正常動作しない可能性 | 中 | 事前にPoC実施。yaxis2はlayoutレベル機能のためtrace typeに依存しない |
-| フロントエンドOLS計算の精度 | 低 | 装置の作業時間データ規模（数百〜数千点）ではJS浮動小数点精度で十分 |
-| 特徴量組み合わせで次元爆発 | 低 | UI側でパラメータ上限を設定（window最大50、lags最大5等） |
-| DB migration（既存データ） | 低 | DROP TABLE IF EXISTS + ALTER TABLE ADD COLUMNで対応。SQLiteの制約内 |
+| 特徴量組み合わせで次元爆発 | 低 | UI側でパラメータ上限を設定 |
+| DB migration（既存データ） | 低 | ALTER TABLE ADD COLUMNで対応。SQLiteの制約内 |
