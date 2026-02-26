@@ -9,6 +9,9 @@ import pytest
 from backend.analysis.feature import (
     FEATURE_REGISTRY,
     CompositeFeatureBuilder,
+    DiffFeatureBuilder,
+    MovingAvgFeatureBuilder,
+    MovingStdFeatureBuilder,
     RawWorkTimeFeatureBuilder,
     create_feature_builder,
 )
@@ -64,6 +67,108 @@ class TestCompositeFeatureBuilder:
         mock_builder.build.assert_called_once_with([10.0, 20.0], ts)
 
 
+class TestDiffFeatureBuilder:
+    """DiffFeatureBuilder のユニットテスト."""
+
+    def test_basic_diff(self):
+        """[10, 20, 35] → diff=[0, 10, 15], shape (3, 1)."""
+        builder = DiffFeatureBuilder()
+        result = builder.build([10.0, 20.0, 35.0])
+        assert result.shape == (3, 1)
+        np.testing.assert_array_almost_equal(
+            result.flatten(), [0.0, 10.0, 15.0]
+        )
+
+    def test_first_element_zero_padded(self):
+        """先頭要素は 0 パディング."""
+        builder = DiffFeatureBuilder()
+        result = builder.build([5.0, 8.0])
+        assert result[0, 0] == 0.0
+
+    def test_empty_input(self):
+        """空入力 → shape (0, 1)."""
+        builder = DiffFeatureBuilder()
+        result = builder.build([])
+        assert result.shape == (0, 1)
+
+    def test_single_element(self):
+        """1件 → [0.0], shape (1, 1)."""
+        builder = DiffFeatureBuilder()
+        result = builder.build([42.0])
+        assert result.shape == (1, 1)
+        assert result[0, 0] == 0.0
+
+
+class TestMovingAvgFeatureBuilder:
+    """MovingAvgFeatureBuilder のユニットテスト."""
+
+    def test_basic_moving_avg(self):
+        """window=3, [10, 20, 30, 40, 50] → index2=20, index3=30."""
+        builder = MovingAvgFeatureBuilder(window=3)
+        result = builder.build([10.0, 20.0, 30.0, 40.0, 50.0])
+        assert result.shape == (5, 1)
+        assert result[2, 0] == pytest.approx(20.0)
+        assert result[3, 0] == pytest.approx(30.0)
+
+    def test_padding_is_zero(self):
+        """window 未満の先頭は 0 パディング."""
+        builder = MovingAvgFeatureBuilder(window=3)
+        result = builder.build([10.0, 20.0, 30.0])
+        assert result[0, 0] == 0.0
+        assert result[1, 0] == 0.0
+
+    def test_default_window_is_5(self):
+        """デフォルト window=5."""
+        builder = MovingAvgFeatureBuilder()
+        result = builder.build([1.0, 2.0, 3.0, 4.0, 5.0, 6.0])
+        assert result.shape == (6, 1)
+        # index 0-3: 0パディング, index 4: avg(1,2,3,4,5)=3.0
+        assert result[4, 0] == pytest.approx(3.0)
+
+    def test_empty_input(self):
+        """空入力 → shape (0, 1)."""
+        builder = MovingAvgFeatureBuilder()
+        result = builder.build([])
+        assert result.shape == (0, 1)
+
+
+class TestMovingStdFeatureBuilder:
+    """MovingStdFeatureBuilder のユニットテスト."""
+
+    def test_constant_data_zero_std(self):
+        """定数データ → std=0."""
+        builder = MovingStdFeatureBuilder(window=3)
+        result = builder.build([5.0, 5.0, 5.0, 5.0])
+        assert result[2, 0] == pytest.approx(0.0)
+        assert result[3, 0] == pytest.approx(0.0)
+
+    def test_padding_is_zero(self):
+        """window 未満の先頭は 0 パディング."""
+        builder = MovingStdFeatureBuilder(window=3)
+        result = builder.build([10.0, 20.0, 30.0])
+        assert result[0, 0] == 0.0
+        assert result[1, 0] == 0.0
+
+    def test_default_window_is_5(self):
+        """デフォルト window=5."""
+        builder = MovingStdFeatureBuilder()
+        result = builder.build([1.0] * 6)
+        assert result.shape == (6, 1)
+
+    def test_known_std(self):
+        """既知データで母集団標準偏差を検証."""
+        builder = MovingStdFeatureBuilder(window=3)
+        result = builder.build([10.0, 20.0, 30.0])
+        expected = np.std([10.0, 20.0, 30.0])
+        assert result[2, 0] == pytest.approx(expected)
+
+    def test_empty_input(self):
+        """空入力 → shape (0, 1)."""
+        builder = MovingStdFeatureBuilder()
+        result = builder.build([])
+        assert result.shape == (0, 1)
+
+
 class TestFeatureRegistry:
     """FEATURE_REGISTRY の検証."""
 
@@ -84,6 +189,19 @@ class TestFeatureRegistry:
         assert isinstance(entry["description"], str)
         assert len(entry["description"]) > 0
         assert isinstance(entry["params_schema"], dict)
+
+    def test_all_adopted_features_registered(self):
+        """採用された全特徴量が登録されている."""
+        for key in ["raw_work_time", "diff", "moving_avg", "moving_std"]:
+            assert key in FEATURE_REGISTRY
+
+    def test_all_entries_have_metadata(self):
+        """全エントリに必須メタデータがある."""
+        for key, entry in FEATURE_REGISTRY.items():
+            assert "builder" in entry, f"{key}: builder missing"
+            assert isinstance(entry["label"], str)
+            assert isinstance(entry["description"], str)
+            assert isinstance(entry["params_schema"], dict)
 
 
 class TestCreateFeatureBuilder:
@@ -124,6 +242,27 @@ class TestCreateFeatureBuilder:
         )
         with pytest.raises(ValueError, match="Unknown feature type"):
             create_feature_builder(config)
+
+    def test_diff_spec(self):
+        """diff FeatureSpec → DiffFeatureBuilder."""
+        config = FeatureConfig(features=[FeatureSpec(feature_type="diff")])
+        builder = create_feature_builder(config)
+        assert isinstance(builder, DiffFeatureBuilder)
+
+    def test_composite_with_all_features(self):
+        """raw + diff + moving_avg + moving_std → Composite, 4次元."""
+        config = FeatureConfig(
+            features=[
+                FeatureSpec(feature_type="raw_work_time"),
+                FeatureSpec(feature_type="diff"),
+                FeatureSpec(feature_type="moving_avg"),
+                FeatureSpec(feature_type="moving_std"),
+            ]
+        )
+        builder = create_feature_builder(config)
+        assert isinstance(builder, CompositeFeatureBuilder)
+        result = builder.build([10.0, 20.0, 30.0, 40.0, 50.0])
+        assert result.shape == (5, 4)
 
 
 class TestFeatureSpecDataclass:
