@@ -62,6 +62,32 @@ class SqliteResultStore(ResultStoreInterface):
         self._conn.execute("PRAGMA foreign_keys = ON")
         self._conn.executescript(SCHEMA_SQL)
         self._conn.commit()
+        self._migrate()
+
+    def _migrate(self) -> None:
+        """既存DBのスキーマをマイグレーションする。"""
+        # v1→v2: trend_results から is_warning 列を削除
+        cols = [
+            row[1]
+            for row in self._conn.execute("PRAGMA table_info(trend_results)")
+        ]
+        if "is_warning" in cols:
+            self._conn.executescript("""
+                CREATE TABLE trend_results_new (
+                    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                    category_id INTEGER NOT NULL UNIQUE,
+                    slope       REAL NOT NULL,
+                    intercept   REAL NOT NULL
+                );
+                INSERT INTO trend_results_new
+                    (id, category_id, slope, intercept)
+                    SELECT id, category_id, slope, intercept
+                    FROM trend_results;
+                DROP TABLE trend_results;
+                ALTER TABLE trend_results_new
+                    RENAME TO trend_results;
+            """)
+            self._conn.commit()
 
     def save_trend_result(self, result: TrendResult) -> None:
         with self._conn:
