@@ -4,6 +4,7 @@ import json
 import sqlite3
 from datetime import datetime
 
+from backend.interfaces.feature import FeatureConfig, FeatureSpec
 from backend.interfaces.result_store import (
     AnomalyResult,
     ModelDefinition,
@@ -36,7 +37,8 @@ CREATE TABLE IF NOT EXISTS model_definitions (
     baseline_start  TIMESTAMP NOT NULL,
     baseline_end    TIMESTAMP NOT NULL,
     sensitivity     REAL NOT NULL,
-    excluded_points TEXT DEFAULT '[]'
+    excluded_points TEXT DEFAULT '[]',
+    feature_config  TEXT DEFAULT NULL
 );
 """
 
@@ -87,6 +89,20 @@ class SqliteResultStore(ResultStoreInterface):
                 ALTER TABLE trend_results_new
                     RENAME TO trend_results;
             """)
+            self._conn.commit()
+
+        # v2→v3: model_definitions に feature_config 列追加
+        md_cols = [
+            row[1]
+            for row in self._conn.execute(
+                "PRAGMA table_info(model_definitions)"
+            )
+        ]
+        if "feature_config" not in md_cols:
+            self._conn.execute(
+                "ALTER TABLE model_definitions"
+                " ADD COLUMN feature_config TEXT DEFAULT NULL"
+            )
             self._conn.commit()
 
     def save_trend_result(self, result: TrendResult) -> None:
@@ -157,18 +173,30 @@ class SqliteResultStore(ResultStoreInterface):
                 for dt in definition.excluded_points
             ]
         )
+        feature_config_json = None
+        if definition.feature_config is not None:
+            feature_config_json = json.dumps(
+                [
+                    {
+                        "feature_type": fs.feature_type,
+                        "params": fs.params,
+                    }
+                    for fs in definition.feature_config.features
+                ]
+            )
         with self._conn:
             self._conn.execute(
                 """
                 INSERT INTO model_definitions
                     (category_id, baseline_start, baseline_end,
-                     sensitivity, excluded_points)
-                VALUES (?, ?, ?, ?, ?)
+                     sensitivity, excluded_points, feature_config)
+                VALUES (?, ?, ?, ?, ?, ?)
                 ON CONFLICT(category_id)
                 DO UPDATE SET baseline_start = excluded.baseline_start,
                               baseline_end = excluded.baseline_end,
                               sensitivity = excluded.sensitivity,
-                              excluded_points = excluded.excluded_points
+                              excluded_points = excluded.excluded_points,
+                              feature_config = excluded.feature_config
                 """,
                 (
                     definition.category_id,
@@ -176,13 +204,14 @@ class SqliteResultStore(ResultStoreInterface):
                     definition.baseline_end,
                     definition.sensitivity,
                     excluded_json,
+                    feature_config_json,
                 ),
             )
 
     def get_model_definition(self, category_id: int) -> ModelDefinition | None:
         row = self._conn.execute(
             "SELECT category_id, baseline_start,"
-            " baseline_end, sensitivity, excluded_points"
+            " baseline_end, sensitivity, excluded_points, feature_config"
             " FROM model_definitions WHERE category_id = ?",
             (category_id,),
         ).fetchone()
@@ -192,12 +221,19 @@ class SqliteResultStore(ResultStoreInterface):
             datetime.fromisoformat(s).replace(tzinfo=None)
             for s in json.loads(row[4])
         ]
+        feature_config = None
+        if row[5] is not None:
+            specs = json.loads(row[5])
+            feature_config = FeatureConfig(
+                features=[FeatureSpec(**s) for s in specs]
+            )
         return ModelDefinition(
             category_id=row[0],
             baseline_start=row[1],
             baseline_end=row[2],
             sensitivity=row[3],
             excluded_points=excluded,
+            feature_config=feature_config,
         )
 
     def delete_model_definition(self, category_id: int) -> None:

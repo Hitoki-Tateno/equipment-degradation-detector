@@ -27,6 +27,7 @@ from backend.interfaces.data_store import (
     DataStoreInterface,
     WorkRecord,
 )
+from backend.interfaces.feature import FeatureConfig, FeatureSpec
 from backend.interfaces.result_store import (
     ModelDefinition,
     ResultStoreInterface,
@@ -104,6 +105,13 @@ class AnomalyResultResponse(BaseModel):
     )
 
 
+class FeatureSpecRequest(BaseModel):
+    """特徴量ビルダーの指定。"""
+
+    feature_type: str
+    params: dict = {}
+
+
 class ModelDefinitionRequest(BaseModel):
     """モデル定義の更新リクエスト。"""
 
@@ -111,6 +119,7 @@ class ModelDefinitionRequest(BaseModel):
     baseline_end: datetime
     sensitivity: float
     excluded_points: list[datetime] = []
+    feature_config: list[FeatureSpecRequest] | None = None
 
     @field_validator("baseline_start", "baseline_end", mode="after")
     @classmethod
@@ -136,6 +145,7 @@ class ModelDefinitionResponse(BaseModel):
     baseline_end: datetime
     sensitivity: float
     excluded_points: list[datetime]
+    feature_config: list[FeatureSpecRequest] | None = None
 
 
 class DashboardCategorySummary(BaseModel):
@@ -339,12 +349,19 @@ async def get_model_definition(
         raise HTTPException(
             status_code=404, detail="Model definition not found"
         )
+    fc = None
+    if definition.feature_config is not None:
+        fc = [
+            FeatureSpecRequest(feature_type=fs.feature_type, params=fs.params)
+            for fs in definition.feature_config.features
+        ]
     return ModelDefinitionResponse(
         category_id=definition.category_id,
         baseline_start=definition.baseline_start,
         baseline_end=definition.baseline_end,
         sensitivity=definition.sensitivity,
         excluded_points=definition.excluded_points,
+        feature_config=fc,
     )
 
 
@@ -358,10 +375,22 @@ async def put_model_definition(
 ):
     """モデル定義を保存し、異常検知を実行する."""
     existing = result_store.get_model_definition(category_id)
+
+    # feature_config を FeatureConfig に変換
+    feature_config = None
+    if body.feature_config is not None:
+        feature_config = FeatureConfig(
+            features=[
+                FeatureSpec(feature_type=f.feature_type, params=f.params)
+                for f in body.feature_config
+            ]
+        )
+
     baseline_changed = existing is None or (
         existing.baseline_start != body.baseline_start
         or existing.baseline_end != body.baseline_end
         or sorted(existing.excluded_points) != sorted(body.excluded_points)
+        or existing.feature_config != feature_config
     )
 
     definition = ModelDefinition(
@@ -370,6 +399,7 @@ async def put_model_definition(
         baseline_end=body.baseline_end,
         sensitivity=body.sensitivity,
         excluded_points=body.excluded_points,
+        feature_config=feature_config,
     )
     result_store.save_model_definition(definition)
     engine.run(category_id)
@@ -393,6 +423,23 @@ async def delete_model_definition_endpoint(
     result_store.delete_model_definition(category_id)
     bus.publish("dashboard-updated")
     return {"deleted": True}
+
+
+@app.get("/api/features/registry")
+async def get_feature_registry():
+    """利用可能な特徴量一覧を返す。"""
+    from backend.analysis.feature import FEATURE_REGISTRY
+
+    return {
+        "features": [
+            {
+                "feature_type": key,
+                "label": key,
+                "params_schema": {},
+            }
+            for key in FEATURE_REGISTRY
+        ]
+    }
 
 
 @app.post("/api/analysis/run")

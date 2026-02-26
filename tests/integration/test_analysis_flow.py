@@ -595,3 +595,156 @@ class TestDashboardSummary:
         paths = {c["category_path"] for c in cats}
         assert "Root > Mid > Leaf1" in paths
         assert "Root > Mid > Leaf2" in paths
+
+
+# --- 特徴量アセットシステム統合テスト (issue #80) ---
+
+
+class TestFeatureRegistryEndpoint:
+    """GET /api/features/registry — 利用可能な特徴量一覧."""
+
+    def test_returns_feature_list(self, client):
+        """レジストリに登録された特徴量が返される."""
+        resp = client.get("/api/features/registry")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "features" in data
+        feature_types = [f["feature_type"] for f in data["features"]]
+        assert "raw_work_time" in feature_types
+
+    def test_each_feature_has_required_fields(self, client):
+        """各特徴量に feature_type, label, params_schema が含まれる."""
+        resp = client.get("/api/features/registry")
+        for feat in resp.json()["features"]:
+            assert "feature_type" in feat
+            assert "label" in feat
+            assert "params_schema" in feat
+
+
+class TestModelDefinitionWithFeatureConfig:
+    """PUT/GET /api/models — feature_config の送受信."""
+
+    def test_put_model_with_feature_config(self, client):
+        """feature_config 付きでモデル保存 → GET で取得できる."""
+        client.post(
+            "/api/records",
+            json={
+                "records": [
+                    {
+                        "category_path": ["FC", "E"],
+                        "work_time": 10.0,
+                        "recorded_at": "2025-01-01T00:00:00",
+                    },
+                    {
+                        "category_path": ["FC", "E"],
+                        "work_time": 10.5,
+                        "recorded_at": "2025-02-01T00:00:00",
+                    },
+                ]
+            },
+        )
+        tree = client.get("/api/categories")
+        leaf_id = tree.json()["categories"][0]["children"][0]["id"]
+
+        resp = client.put(
+            f"/api/models/{leaf_id}",
+            json={
+                "baseline_start": "2025-01-01T00:00:00",
+                "baseline_end": "2025-12-31T00:00:00",
+                "sensitivity": 0.5,
+                "excluded_points": [],
+                "feature_config": [
+                    {"feature_type": "raw_work_time", "params": {}},
+                ],
+            },
+        )
+        assert resp.status_code == 200
+
+        get_resp = client.get(f"/api/models/{leaf_id}")
+        assert get_resp.status_code == 200
+        model = get_resp.json()
+        assert model["feature_config"] is not None
+        assert len(model["feature_config"]) == 1
+        assert model["feature_config"][0]["feature_type"] == "raw_work_time"
+
+    def test_put_model_without_feature_config(self, client):
+        """feature_config なし → GET で null が返る（後方互換）."""
+        client.post(
+            "/api/records",
+            json={
+                "records": [
+                    {
+                        "category_path": ["FC2", "E"],
+                        "work_time": 10.0,
+                        "recorded_at": "2025-01-01T00:00:00",
+                    },
+                ]
+            },
+        )
+        tree = client.get("/api/categories")
+        leaf_id = tree.json()["categories"][0]["children"][0]["id"]
+
+        resp = client.put(
+            f"/api/models/{leaf_id}",
+            json={
+                "baseline_start": "2025-01-01T00:00:00",
+                "baseline_end": "2025-12-31T00:00:00",
+                "sensitivity": 0.5,
+                "excluded_points": [],
+            },
+        )
+        assert resp.status_code == 200
+
+        get_resp = client.get(f"/api/models/{leaf_id}")
+        assert get_resp.status_code == 200
+        model = get_resp.json()
+        assert model["feature_config"] is None
+
+    def test_feature_config_change_triggers_retrain(self, client):
+        """feature_config 変更 → retrained=True."""
+        client.post(
+            "/api/records",
+            json={
+                "records": [
+                    {
+                        "category_path": ["FC3", "E"],
+                        "work_time": 10.0,
+                        "recorded_at": "2025-01-01T00:00:00",
+                    },
+                    {
+                        "category_path": ["FC3", "E"],
+                        "work_time": 10.5,
+                        "recorded_at": "2025-02-01T00:00:00",
+                    },
+                ]
+            },
+        )
+        tree = client.get("/api/categories")
+        leaf_id = tree.json()["categories"][0]["children"][0]["id"]
+
+        # 1回目: feature_config なし
+        client.put(
+            f"/api/models/{leaf_id}",
+            json={
+                "baseline_start": "2025-01-01T00:00:00",
+                "baseline_end": "2025-12-31T00:00:00",
+                "sensitivity": 0.5,
+                "excluded_points": [],
+            },
+        )
+
+        # 2回目: feature_config を追加
+        resp = client.put(
+            f"/api/models/{leaf_id}",
+            json={
+                "baseline_start": "2025-01-01T00:00:00",
+                "baseline_end": "2025-12-31T00:00:00",
+                "sensitivity": 0.5,
+                "excluded_points": [],
+                "feature_config": [
+                    {"feature_type": "raw_work_time"},
+                ],
+            },
+        )
+        assert resp.status_code == 200
+        assert resp.json()["retrained"] is True

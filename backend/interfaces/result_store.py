@@ -4,9 +4,16 @@
 分析層が書き込み、表示層が読み取る。
 """
 
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from datetime import datetime
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from datetime import datetime
+
+    from backend.interfaces.feature import FeatureConfig
 
 
 @dataclass(frozen=True)
@@ -47,6 +54,7 @@ class ModelDefinition:
     baseline_end: datetime
     sensitivity: float
     excluded_points: list[datetime] = field(default_factory=list)
+    feature_config: FeatureConfig | None = None
 
 
 class ResultStoreInterface(ABC):
