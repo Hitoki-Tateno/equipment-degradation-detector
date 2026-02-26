@@ -13,7 +13,8 @@ function computeThreshold(sensitivity, anomalies) {
   return max - sensitivity * (max - min);
 }
 
-const PLOT_STYLE = { width: '100%', height: '400px' };
+const PLOT_STYLE_DEFAULT = { width: '100%', height: '400px' };
+const PLOT_STYLE_WITH_SUB = { width: '100%', height: '560px' };
 
 /**
  * 作業時間の散布図。Plotly.jsで描画し、ドラッグ選択・クリック操作を処理する。
@@ -55,31 +56,20 @@ function WorkTimePlot({
     }
   }, [interactionMode]);
 
-  // recorded_at → anomaly_score のルックアップマップ
-  const anomalyMap = useMemo(() => {
-    const map = {};
-    if (anomalies) {
-      anomalies.forEach((a) => {
-        map[a.recorded_at] = a.anomaly_score;
-      });
-    }
-    return map;
-  }, [anomalies]);
-
   const threshold = useMemo(
     () => computeThreshold(sensitivity, anomalies),
     [sensitivity, anomalies],
   );
 
-  // 各ポイントの色: 除外=グレー, 異常=赤, 正常=青
+  const hasAnomalies = anomalies && anomalies.length > 0;
+
+  // 各ポイントの色: 除外=グレー, それ以外=青
   const markerColors = useMemo(() => {
-    return records.map((r, i) => {
+    return records.map((_, i) => {
       if (excludedIndices && excludedIndices.includes(i)) return '#bfbfbf';
-      const score = anomalyMap[r.recorded_at];
-      if (score !== undefined && score > threshold) return '#ff4d4f';
       return '#1890ff';
     });
-  }, [records, excludedIndices, anomalyMap, threshold]);
+  }, [records, excludedIndices]);
 
   // 除外ポイントは×マーカー、それ以外は○
   const markerSymbols = useMemo(() => {
@@ -111,14 +101,30 @@ function WorkTimePlot({
         name: 'トレンド',
       });
     }
+    // 異常スコアサブチャート
+    if (hasAnomalies) {
+      const scoreColors = anomalies.map((a) =>
+        a.anomaly_score > threshold ? '#ff4d4f' : '#1890ff',
+      );
+      t.push({
+        x: anomalies.map((a) => a.recorded_at),
+        y: anomalies.map((a) => a.anomaly_score),
+        type: 'scattergl',
+        mode: 'markers',
+        marker: { color: scoreColors, size: 6 },
+        yaxis: 'y2',
+        name: '異常スコア',
+        hovertemplate: 'スコア: %{y:.3f}<extra></extra>',
+      });
+    }
     return t;
-  }, [x, y, n, markerColors, markerSymbols, trend]);
+  }, [x, y, n, markerColors, markerSymbols, trend, hasAnomalies, anomalies, threshold]);
 
-  // ベースライン範囲を半透明の矩形で表示
+  // ベースライン範囲の矩形 + 閾値ライン
   const shapes = useMemo(() => {
-    if (!baselineRange) return [];
-    return [
-      {
+    const s = [];
+    if (baselineRange) {
+      s.push({
         type: 'rect',
         xref: 'x',
         yref: 'paper',
@@ -132,9 +138,23 @@ function WorkTimePlot({
           width: 1,
           dash: 'dot',
         },
-      },
-    ];
-  }, [baselineRange]);
+      });
+    }
+    // 異常スコアサブチャートの閾値ライン
+    if (hasAnomalies) {
+      s.push({
+        type: 'line',
+        xref: 'paper',
+        yref: 'y2',
+        x0: 0,
+        x1: 1,
+        y0: threshold,
+        y1: threshold,
+        line: { color: 'rgba(255, 77, 79, 0.6)', width: 2, dash: 'dash' },
+      });
+    }
+    return s;
+  }, [baselineRange, hasAnomalies, threshold]);
 
   // ドラッグ選択完了 → ベースライン範囲をセット（選択モード時のみ）
   const handleSelected = useCallback(
@@ -150,14 +170,13 @@ function WorkTimePlot({
     [interactionMode, onBaselineSelect],
   );
 
-  // ポイントクリック → 除外点をトグル（選択モード時のみ）
+  // ポイントクリック → 除外点をトグル（選択モード・メインtraceのみ）
   const handleClick = useCallback(
     (event) => {
       if (interactionMode !== 'select') return;
       if (
-        event &&
-        event.points &&
-        event.points.length > 0 &&
+        event?.points?.length > 0 &&
+        event.points[0].curveNumber === 0 &&
         onToggleExclude
       ) {
         onToggleExclude(event.points[0].pointIndex);
@@ -182,12 +201,21 @@ function WorkTimePlot({
       },
       yaxis: {
         title: '作業時間 t (秒)',
+        domain: hasAnomalies ? [0.33, 1.0] : [0, 1],
       },
+      ...(hasAnomalies && {
+        yaxis2: {
+          title: '異常スコア',
+          domain: [0.0, 0.23],
+          range: [0, 1.05],
+          anchor: 'x',
+        },
+      }),
       margin: { t: 20, r: 20 },
       autosize: true,
       shapes,
     }),
-    [interactionMode, shapes, categoryId],
+    [interactionMode, shapes, categoryId, hasAnomalies],
   );
 
   return (
@@ -198,7 +226,7 @@ function WorkTimePlot({
       onClick={handleClick}
       onInitialized={handlePlotInitialized}
       useResizeHandler
-      style={PLOT_STYLE}
+      style={hasAnomalies ? PLOT_STYLE_WITH_SUB : PLOT_STYLE_DEFAULT}
     />
   );
 }
