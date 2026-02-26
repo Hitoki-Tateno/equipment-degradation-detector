@@ -3,7 +3,10 @@
 import numpy as np
 
 from backend.analysis.anomaly import train_and_score
-from backend.analysis.feature import RawWorkTimeFeatureBuilder
+from backend.analysis.feature import (
+    RawWorkTimeFeatureBuilder,
+    create_feature_builder,
+)
 from backend.analysis.trend import compute_trend
 from backend.interfaces.data_store import (
     CategoryNode,
@@ -82,10 +85,20 @@ class AnalysisEngine:
             if not baseline_records:
                 return
 
+            # feature_config で動的ビルダー生成
+            if model_def.feature_config is not None:
+                feature_builder = create_feature_builder(
+                    model_def.feature_config
+                )
+            else:
+                feature_builder = self._feature_builder
+
             baseline_wt = [r.work_time for r in baseline_records]
             all_wt = [r.work_time for r in records]
-            baseline_feat = self._feature_builder.build(baseline_wt)
-            all_feat = self._feature_builder.build(all_wt)
+            baseline_ts = [r.recorded_at for r in baseline_records]
+            all_ts = [r.recorded_at for r in records]
+            baseline_feat = feature_builder.build(baseline_wt, baseline_ts)
+            all_feat = feature_builder.build(all_wt, all_ts)
 
             scores = train_and_score(baseline_feat, all_feat)
 

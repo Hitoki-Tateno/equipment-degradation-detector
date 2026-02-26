@@ -48,11 +48,18 @@ class TestRawWorkTimeFeatureBuilder:
         result = builder.build((5.0, 10.0))
         assert result.shape == (2, 1)
 
+    def test_build_with_timestamps(self):
+        """timestamps を渡してもエラーにならない."""
+        builder = RawWorkTimeFeatureBuilder()
+        ts = [datetime(2025, 1, 1), datetime(2025, 2, 1)]
+        result = builder.build([10.0, 20.0], timestamps=ts)
+        assert result.shape == (2, 1)
+
     def test_build_rejects_non_2d(self):
         """_build_impl が1次元を返した場合 ValueError."""
 
         class BadBuilder(FeatureBuilder):
-            def _build_impl(self, work_times):
+            def _build_impl(self, work_times, timestamps=None):
                 return np.array(list(work_times))
 
         with pytest.raises(ValueError, match="2D array"):
@@ -609,3 +616,134 @@ class TestAnalysisEngineDatetimeMix:
         mock_result_store.save_anomaly_results.assert_called_once()
         saved = mock_result_store.save_anomaly_results.call_args[0][0]
         assert len(saved) == 3
+
+
+# --- 特徴量アセットシステム統合テスト (issue #80) ---
+
+
+class TestAnalysisEngineFeatureConfig:
+    """AnalysisEngine の feature_config 統合テスト."""
+
+    def test_feature_config_used_when_present(
+        self, mock_data_store, mock_result_store
+    ):
+        """feature_config がある → 動的ビルダー使用."""
+        from backend.interfaces.feature import FeatureConfig, FeatureSpec
+
+        records = [
+            WorkRecord(
+                category_id=1,
+                work_time=10.0,
+                recorded_at=datetime(2025, 1, 1),
+            ),
+            WorkRecord(
+                category_id=1,
+                work_time=10.5,
+                recorded_at=datetime(2025, 2, 1),
+            ),
+            WorkRecord(
+                category_id=1,
+                work_time=10.2,
+                recorded_at=datetime(2025, 3, 1),
+            ),
+        ]
+        mock_data_store.get_records.return_value = records
+        mock_result_store.get_model_definition.return_value = ModelDefinition(
+            category_id=1,
+            baseline_start=datetime(2025, 1, 1),
+            baseline_end=datetime(2025, 3, 1),
+            sensitivity=0.5,
+            excluded_points=[],
+            feature_config=FeatureConfig(
+                features=[
+                    FeatureSpec(feature_type="raw_work_time"),
+                    FeatureSpec(feature_type="raw_work_time"),
+                ]
+            ),
+        )
+
+        engine = AnalysisEngine(mock_data_store, mock_result_store)
+        engine.run(1)
+
+        mock_result_store.save_anomaly_results.assert_called_once()
+        saved = mock_result_store.save_anomaly_results.call_args[0][0]
+        assert len(saved) == 3
+
+    def test_no_feature_config_uses_default_builder(
+        self, mock_data_store, mock_result_store
+    ):
+        """ModelDefinition に feature_config=None → デフォルトビルダー使用."""
+        records = [
+            WorkRecord(
+                category_id=1,
+                work_time=10.0,
+                recorded_at=datetime(2025, 1, 1),
+            ),
+            WorkRecord(
+                category_id=1,
+                work_time=10.5,
+                recorded_at=datetime(2025, 2, 1),
+            ),
+            WorkRecord(
+                category_id=1,
+                work_time=10.2,
+                recorded_at=datetime(2025, 3, 1),
+            ),
+        ]
+        mock_data_store.get_records.return_value = records
+        mock_result_store.get_model_definition.return_value = ModelDefinition(
+            category_id=1,
+            baseline_start=datetime(2025, 1, 1),
+            baseline_end=datetime(2025, 3, 1),
+            sensitivity=0.5,
+            excluded_points=[],
+            feature_config=None,
+        )
+
+        engine = AnalysisEngine(mock_data_store, mock_result_store)
+        engine.run(1)
+
+        mock_result_store.save_anomaly_results.assert_called_once()
+        saved = mock_result_store.save_anomaly_results.call_args[0][0]
+        assert len(saved) == 3
+
+    def test_timestamps_passed_to_feature_builder(
+        self, mock_data_store, mock_result_store
+    ):
+        """engine.run() が feature_builder.build() に timestamps を渡す."""
+        records = [
+            WorkRecord(
+                category_id=1,
+                work_time=10.0,
+                recorded_at=datetime(2025, 1, 1),
+            ),
+            WorkRecord(
+                category_id=1,
+                work_time=10.5,
+                recorded_at=datetime(2025, 2, 1),
+            ),
+        ]
+        mock_data_store.get_records.return_value = records
+        mock_result_store.get_model_definition.return_value = ModelDefinition(
+            category_id=1,
+            baseline_start=datetime(2025, 1, 1),
+            baseline_end=datetime(2025, 2, 1),
+            sensitivity=0.5,
+            excluded_points=[],
+            feature_config=None,
+        )
+
+        mock_builder = MagicMock(spec=FeatureBuilder)
+        mock_builder.build.return_value = np.array([[1.0], [2.0]])
+
+        engine = AnalysisEngine(
+            mock_data_store, mock_result_store, feature_builder=mock_builder
+        )
+        engine.run(1)
+
+        assert mock_builder.build.call_count == 2
+        for call in mock_builder.build.call_args_list:
+            args, kwargs = call
+            assert len(args) >= 2 or "timestamps" in kwargs
+            timestamps = args[1] if len(args) >= 2 else kwargs["timestamps"]
+            assert all(isinstance(t, datetime) for t in timestamps)

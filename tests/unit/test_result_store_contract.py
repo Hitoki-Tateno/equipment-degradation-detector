@@ -145,6 +145,85 @@ class TestModelDefinitions:
     ):
         result_store.delete_model_definition(999)
 
+    def test_save_and_get_with_feature_config(
+        self, result_store: ResultStoreInterface
+    ):
+        """feature_config 付き ModelDefinition の保存と読込."""
+        from backend.interfaces.feature import FeatureConfig, FeatureSpec
+
+        config = FeatureConfig(
+            features=[
+                FeatureSpec(feature_type="raw_work_time"),
+                FeatureSpec(feature_type="moving_avg", params={"window": 5}),
+            ]
+        )
+        defn = ModelDefinition(
+            category_id=1,
+            baseline_start=datetime(2025, 1, 1),
+            baseline_end=datetime(2025, 6, 1),
+            sensitivity=0.5,
+            excluded_points=[],
+            feature_config=config,
+        )
+        result_store.save_model_definition(defn)
+
+        loaded = result_store.get_model_definition(1)
+        assert loaded is not None
+        assert loaded.feature_config is not None
+        assert len(loaded.feature_config.features) == 2
+        assert (
+            loaded.feature_config.features[0].feature_type == "raw_work_time"
+        )
+        assert loaded.feature_config.features[1].feature_type == "moving_avg"
+        assert loaded.feature_config.features[1].params == {"window": 5}
+
+    def test_save_and_get_without_feature_config(
+        self, result_store: ResultStoreInterface
+    ):
+        """feature_config=None の ModelDefinition → None で読込（後方互換）."""
+        defn = ModelDefinition(
+            category_id=1,
+            baseline_start=datetime(2025, 1, 1),
+            baseline_end=datetime(2025, 6, 1),
+            sensitivity=0.5,
+            excluded_points=[],
+        )
+        result_store.save_model_definition(defn)
+
+        loaded = result_store.get_model_definition(1)
+        assert loaded is not None
+        assert loaded.feature_config is None
+
+    def test_overwrite_feature_config(
+        self, result_store: ResultStoreInterface
+    ):
+        """feature_config を上書き保存 → 新しい値で読込."""
+        from backend.interfaces.feature import FeatureConfig, FeatureSpec
+
+        defn1 = ModelDefinition(
+            category_id=1,
+            baseline_start=datetime(2025, 1, 1),
+            baseline_end=datetime(2025, 6, 1),
+            sensitivity=0.5,
+            feature_config=FeatureConfig(
+                features=[FeatureSpec(feature_type="raw_work_time")]
+            ),
+        )
+        result_store.save_model_definition(defn1)
+
+        defn2 = ModelDefinition(
+            category_id=1,
+            baseline_start=datetime(2025, 1, 1),
+            baseline_end=datetime(2025, 6, 1),
+            sensitivity=0.5,
+            feature_config=None,
+        )
+        result_store.save_model_definition(defn2)
+
+        loaded = result_store.get_model_definition(1)
+        assert loaded is not None
+        assert loaded.feature_config is None
+
 
 class TestDatetimeNormalization:
     """offset-aware datetime がストア経由で offset-naive に正規化される。"""
