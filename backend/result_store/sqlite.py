@@ -69,9 +69,7 @@ class SqliteResultStore(ResultStoreInterface):
         # v1→v2: trend_results から is_warning 列を削除
         cols = [
             row[1]
-            for row in self._conn.execute(
-                "PRAGMA table_info(trend_results)"
-            )
+            for row in self._conn.execute("PRAGMA table_info(trend_results)")
         ]
         if "is_warning" in cols:
             self._conn.executescript("""
