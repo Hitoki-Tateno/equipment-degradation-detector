@@ -245,9 +245,7 @@ class SqliteResultStore(ResultStoreInterface):
             feature_config = FeatureConfig(
                 features=[FeatureSpec(**s) for s in specs]
             )
-        anomaly_params = (
-            json.loads(row[6]) if row[6] is not None else None
-        )
+        anomaly_params = json.loads(row[6]) if row[6] is not None else None
         return ModelDefinition(
             category_id=row[0],
             baseline_start=row[1],
