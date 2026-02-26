@@ -55,6 +55,7 @@ class ModelDefinition:
     sensitivity: float
     excluded_points: list[datetime] = field(default_factory=list)
     feature_config: FeatureConfig | None = None
+    anomaly_params: dict | None = None
 
 
 class ResultStoreInterface(ABC):

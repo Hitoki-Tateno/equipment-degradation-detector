@@ -118,6 +118,51 @@ Step 1（データ可視化）完了後、Step 2（モデル定義）の実装�
 - チュートリアルページにより、ML知識が限定的なユーザーでも特徴量を理解して選択可能
 - ベースライン設定と特徴量選択を同じパネル・同じ保存アクションで行うことで操作の一貫性を確保
 
+### 決定4: Isolation Forest ハイパーパラメータの抽象化
+
+**方針**: `anomaly.py` にハードコードされていた IsolationForest のハイパーパラメータ（`n_estimators`, `contamination`, `max_samples`）を `ModelDefinition` に `anomaly_params` フィールドとして持たせ、内部的に設定可能にする。UIへの露出は本決定のスコープ外。
+
+**対象パラメータ**:
+
+| パラメータ | デフォルト値 | 説明 |
+|-----------|-------------|------|
+| `n_estimators` | 100 | 決定木の数 |
+| `contamination` | 0.01 | 想定される異常割合 |
+| `max_samples` | "auto" | 各木に使うサンプル数 |
+
+`random_state=42` は再現性のため常に固定し、ユーザー設定不可。
+
+**データフロー**:
+```
+ModelDefinition.anomaly_params (dict|None)
+  → AnalysisEngine.run()
+    → train_and_score(baseline_feat, all_feat, anomaly_params=model_def.anomaly_params)
+      → _DEFAULTS とマージ: {**_DEFAULTS, **(anomaly_params or {})}
+        → IsolationForest(n_estimators=..., contamination=..., max_samples=..., random_state=42)
+```
+
+**実装詳細**:
+
+1. **`backend/interfaces/result_store.py`** — `ModelDefinition` に `anomaly_params: dict | None = None` を追加。`feature_config` と同じパターン（オプショナル、Noneでデフォルト動作）。
+
+2. **`backend/analysis/anomaly.py`** — ハードコード値を `_DEFAULTS` モジュール定数に抽出。`train_and_score()` に `anomaly_params: dict | None = None` 引数を追加。`None` の場合は `_DEFAULTS` をそのまま使用し、指定された場合は部分上書きマージ（`{**_DEFAULTS, **(anomaly_params or {})}`）。
+
+3. **`backend/analysis/engine.py`** — `train_and_score()` 呼び出しに `anomaly_params=model_def.anomaly_params` を追加。
+
+4. **`backend/result_store/sqlite.py`** — `model_definitions` テーブルに `anomaly_params TEXT DEFAULT NULL` 列を追加。v3→v4 マイグレーション（`ALTER TABLE ADD COLUMN`）。JSON でシリアライズ/デシリアライズ（`feature_config` と同一パターン）。
+
+5. **API層は変更なし** — `PUT /api/models/{category_id}` のリクエスト/レスポンスモデルは変更せず、バックエンド内部の抽象化に留める。将来的にUIからの設定が必要になった時点でAPI層を拡張する。
+
+**後方互換性**:
+- `anomaly_params=None` → 既存デフォルト値がそのまま適用（動作変更なし）
+- 既存DBレコードは `anomaly_params=NULL` のままで正常動作
+- 部分指定（例: `{"n_estimators": 50}` のみ）→ 未指定パラメータはデフォルト値で補完
+
+**理由**:
+- `feature_config` の実装パターンに合わせることで一貫性を維持
+- ハードコード値をモジュール定数に抽出し、デフォルト値を明示的に管理
+- API層を変更しないことで、フロントエンドへの影響ゼロで内部拡張性を確保
+
 ## 影響範囲
 
 ### 破壊的変更
@@ -125,6 +170,11 @@ Step 1（データ可視化）完了後、Step 2（モデル定義）の実装�
 - `FeatureBuilder`: build()シグネチャ変更（後方互換あり）
 - API: `GET /api/dashboard/summary` のレスポンスから `trend` 削除
 - DB: `trend_results` の `is_warning` 列削除、`model_definitions` に `feature_config` 列追加
+
+### 非破壊的変更（決定4）
+- `ModelDefinition`: `anomaly_params` フィールド追加（デフォルトNone、既存動作に影響なし）
+- `train_and_score()`: `anomaly_params` 引数追加（デフォルトNone、後方互換）
+- DB: `model_definitions` に `anomaly_params` 列追加（`ALTER TABLE ADD COLUMN`、NULL許容）
 
 ### 依存ルール
 変更後も以下を維持する（`test_dependency_rules.py` で強制）:
@@ -138,3 +188,4 @@ Step 1（データ可視化）完了後、Step 2（モデル定義）の実装�
 | Plotly.js gl2d-distでサブプロットが正常動作しない可能性 | 中 | 事前にPoC実施。yaxis2はlayoutレベル機能のためtrace typeに依存しない |
 | 特徴量組み合わせで次元爆発 | 低 | UI側でパラメータ上限を設定 |
 | DB migration（既存データ） | 低 | ALTER TABLE ADD COLUMNで対応。SQLiteの制約内 |
+| anomaly_params に不正な値が渡される可能性 | 低 | scikit-learnがバリデーションしてエラーを返す。API層拡張時にPydanticバリデーション追加 |

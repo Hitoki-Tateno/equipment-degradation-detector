@@ -747,3 +747,82 @@ class TestAnalysisEngineFeatureConfig:
             assert len(args) >= 2 or "timestamps" in kwargs
             timestamps = args[1] if len(args) >= 2 else kwargs["timestamps"]
             assert all(isinstance(t, datetime) for t in timestamps)
+
+
+class TestAnalysisEngineAnomalyParams:
+    """AnalysisEngine の anomaly_params 伝搬テスト."""
+
+    def test_anomaly_params_passed_to_train_and_score(
+        self, mock_data_store, mock_result_store
+    ):
+        """anomaly_params が train_and_score に渡される."""
+        records = [
+            WorkRecord(
+                category_id=1,
+                work_time=10.0,
+                recorded_at=datetime(2025, 1, 1),
+            ),
+            WorkRecord(
+                category_id=1,
+                work_time=10.5,
+                recorded_at=datetime(2025, 2, 1),
+            ),
+            WorkRecord(
+                category_id=1,
+                work_time=10.2,
+                recorded_at=datetime(2025, 3, 1),
+            ),
+        ]
+        mock_data_store.get_records.return_value = records
+        custom_params = {"n_estimators": 50, "contamination": 0.05}
+        mock_result_store.get_model_definition.return_value = ModelDefinition(
+            category_id=1,
+            baseline_start=datetime(2025, 1, 1),
+            baseline_end=datetime(2025, 3, 1),
+            sensitivity=0.5,
+            excluded_points=[],
+            anomaly_params=custom_params,
+        )
+
+        engine = AnalysisEngine(mock_data_store, mock_result_store)
+        engine.run(1)
+
+        mock_result_store.save_anomaly_results.assert_called_once()
+        saved = mock_result_store.save_anomaly_results.call_args[0][0]
+        assert len(saved) == 3
+
+    def test_none_anomaly_params_still_works(
+        self, mock_data_store, mock_result_store
+    ):
+        """anomaly_params=None → デフォルトで正常動作."""
+        records = [
+            WorkRecord(
+                category_id=1,
+                work_time=10.0,
+                recorded_at=datetime(2025, 1, 1),
+            ),
+            WorkRecord(
+                category_id=1,
+                work_time=10.5,
+                recorded_at=datetime(2025, 2, 1),
+            ),
+            WorkRecord(
+                category_id=1,
+                work_time=10.2,
+                recorded_at=datetime(2025, 3, 1),
+            ),
+        ]
+        mock_data_store.get_records.return_value = records
+        mock_result_store.get_model_definition.return_value = ModelDefinition(
+            category_id=1,
+            baseline_start=datetime(2025, 1, 1),
+            baseline_end=datetime(2025, 3, 1),
+            sensitivity=0.5,
+            excluded_points=[],
+            anomaly_params=None,
+        )
+
+        engine = AnalysisEngine(mock_data_store, mock_result_store)
+        engine.run(1)
+
+        mock_result_store.save_anomaly_results.assert_called_once()
