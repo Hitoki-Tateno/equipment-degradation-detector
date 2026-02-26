@@ -63,3 +63,10 @@ omit = ["tests/*"]
 [tool.coverage.report]
 show_missing = true
 fail_under = 85
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "pytest>=9.0.2",
+    "pytest-cov>=7.0.0",
+]
