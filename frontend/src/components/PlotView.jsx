@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Typography, Spin, Empty, Segmented, Alert } from 'antd';
 import { SelectOutlined, ZoomInOutlined } from '@ant-design/icons';
 import WorkTimePlot from './WorkTimePlot';
 import BaselineControls from './BaselineControls';
 import { useBaselineManager } from '../hooks/useBaselineManager';
+import { fetchFeatureRegistry } from '../services/api';
 
 const { Title } = Typography;
 
@@ -29,10 +30,16 @@ function PlotView({ categoryId }) {
     records, trend, anomalies,
     baselineStatus, baselineRange, setBaselineRange,
     excludedIndices, sensitivity, setSensitivity,
+    featureConfig, setFeatureConfig,
     savingBaseline, interactionMode, setInteractionMode,
     loadingRecords, error, clearError,
     saveBaseline, deleteBaseline, toggleExclude,
   } = useBaselineManager(categoryId);
+
+  const [registry, setRegistry] = useState([]);
+  useEffect(() => {
+    fetchFeatureRegistry().then(setRegistry).catch(() => {});
+  }, []);
 
   if (!categoryId) {
     return <Empty description="左のツリーから分類を選択してください" />;
@@ -78,6 +85,9 @@ function PlotView({ categoryId }) {
             baselineRange={baselineRange}
             sensitivity={sensitivity}
             onSensitivityChange={setSensitivity}
+            registry={registry}
+            featureConfig={featureConfig}
+            onFeatureConfigChange={setFeatureConfig}
             onSave={saveBaseline}
             onDelete={deleteBaseline}
             savingBaseline={savingBaseline}

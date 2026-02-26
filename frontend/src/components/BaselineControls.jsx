@@ -1,6 +1,7 @@
 import React, { useCallback, useMemo } from 'react';
 import { Slider, Button, Space, Modal, Typography, Tag } from 'antd';
 import { SaveOutlined, DeleteOutlined } from '@ant-design/icons';
+import FeatureSelector from './FeatureSelector';
 
 const { Text } = Typography;
 
@@ -19,6 +20,9 @@ function BaselineControls({
   baselineRange,
   sensitivity,
   onSensitivityChange,
+  registry,
+  featureConfig,
+  onFeatureConfigChange,
   onSave,
   onDelete,
   savingBaseline,
@@ -84,6 +88,15 @@ function BaselineControls({
             </Text>
           )}
         </div>
+
+        {registry && registry.length > 0 && (
+          <FeatureSelector
+            registry={registry}
+            featureConfig={featureConfig}
+            onFeatureConfigChange={onFeatureConfigChange}
+            disabled={baselineStatus === 'configured'}
+          />
+        )}
 
         <Space>
           {baselineStatus === 'unconfigured' ? (
