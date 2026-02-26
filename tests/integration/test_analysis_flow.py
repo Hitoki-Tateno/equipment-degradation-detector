@@ -621,6 +621,13 @@ class TestFeatureRegistryEndpoint:
             assert "description" in feat
             assert "params_schema" in feat
 
+    def test_new_features_in_registry(self, client):
+        """diff, moving_avg, moving_std がレジストリに含まれる."""
+        resp = client.get("/api/features/registry")
+        types = [f["feature_type"] for f in resp.json()["features"]]
+        for ft in ["diff", "moving_avg", "moving_std"]:
+            assert ft in types
+
 
 class TestModelDefinitionWithFeatureConfig:
     """PUT/GET /api/models — feature_config の送受信."""
