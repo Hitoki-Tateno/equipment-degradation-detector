@@ -100,7 +100,11 @@ class AnalysisEngine:
             baseline_feat = feature_builder.build(baseline_wt, baseline_ts)
             all_feat = feature_builder.build(all_wt, all_ts)
 
-            scores = train_and_score(baseline_feat, all_feat)
+            scores = train_and_score(
+                baseline_feat,
+                all_feat,
+                anomaly_params=model_def.anomaly_params,
+            )
 
             anomaly_results = [
                 AnomalyResult(

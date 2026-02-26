@@ -38,7 +38,8 @@ CREATE TABLE IF NOT EXISTS model_definitions (
     baseline_end    TIMESTAMP NOT NULL,
     sensitivity     REAL NOT NULL,
     excluded_points TEXT DEFAULT '[]',
-    feature_config  TEXT DEFAULT NULL
+    feature_config  TEXT DEFAULT NULL,
+    anomaly_params  TEXT DEFAULT NULL
 );
 """
 
@@ -102,6 +103,14 @@ class SqliteResultStore(ResultStoreInterface):
             self._conn.execute(
                 "ALTER TABLE model_definitions"
                 " ADD COLUMN feature_config TEXT DEFAULT NULL"
+            )
+            self._conn.commit()
+
+        # v3→v4: model_definitions に anomaly_params 列追加
+        if "anomaly_params" not in md_cols:
+            self._conn.execute(
+                "ALTER TABLE model_definitions"
+                " ADD COLUMN anomaly_params TEXT DEFAULT NULL"
             )
             self._conn.commit()
 
@@ -184,19 +193,26 @@ class SqliteResultStore(ResultStoreInterface):
                     for fs in definition.feature_config.features
                 ]
             )
+        anomaly_params_json = (
+            json.dumps(definition.anomaly_params)
+            if definition.anomaly_params is not None
+            else None
+        )
         with self._conn:
             self._conn.execute(
                 """
                 INSERT INTO model_definitions
                     (category_id, baseline_start, baseline_end,
-                     sensitivity, excluded_points, feature_config)
-                VALUES (?, ?, ?, ?, ?, ?)
+                     sensitivity, excluded_points, feature_config,
+                     anomaly_params)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(category_id)
                 DO UPDATE SET baseline_start = excluded.baseline_start,
                               baseline_end = excluded.baseline_end,
                               sensitivity = excluded.sensitivity,
                               excluded_points = excluded.excluded_points,
-                              feature_config = excluded.feature_config
+                              feature_config = excluded.feature_config,
+                              anomaly_params = excluded.anomaly_params
                 """,
                 (
                     definition.category_id,
@@ -205,13 +221,15 @@ class SqliteResultStore(ResultStoreInterface):
                     definition.sensitivity,
                     excluded_json,
                     feature_config_json,
+                    anomaly_params_json,
                 ),
             )
 
     def get_model_definition(self, category_id: int) -> ModelDefinition | None:
         row = self._conn.execute(
             "SELECT category_id, baseline_start,"
-            " baseline_end, sensitivity, excluded_points, feature_config"
+            " baseline_end, sensitivity, excluded_points,"
+            " feature_config, anomaly_params"
             " FROM model_definitions WHERE category_id = ?",
             (category_id,),
         ).fetchone()
@@ -227,6 +245,7 @@ class SqliteResultStore(ResultStoreInterface):
             feature_config = FeatureConfig(
                 features=[FeatureSpec(**s) for s in specs]
             )
+        anomaly_params = json.loads(row[6]) if row[6] is not None else None
         return ModelDefinition(
             category_id=row[0],
             baseline_start=row[1],
@@ -234,6 +253,7 @@ class SqliteResultStore(ResultStoreInterface):
             sensitivity=row[3],
             excluded_points=excluded,
             feature_config=feature_config,
+            anomaly_params=anomaly_params,
         )
 
     def delete_model_definition(self, category_id: int) -> None:

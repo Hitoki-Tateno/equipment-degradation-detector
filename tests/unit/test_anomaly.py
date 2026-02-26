@@ -51,3 +51,67 @@ class TestTrainAndScore:
         scores2 = train_and_score(baseline, all_data)
 
         np.testing.assert_array_equal(scores1, scores2)
+
+
+class TestTrainAndScoreAnomalyParams:
+    """anomaly_params を指定した場合のテスト."""
+
+    def test_none_params_uses_defaults(self):
+        """anomaly_params=None → デフォルト値で正常動作."""
+        baseline = np.array([10.0, 11.0, 10.5, 10.8, 10.2]).reshape(-1, 1)
+        all_data = np.array([10.0, 11.0, 50.0]).reshape(-1, 1)
+
+        scores_none = train_and_score(baseline, all_data, anomaly_params=None)
+        scores_default = train_and_score(baseline, all_data)
+
+        np.testing.assert_array_equal(scores_none, scores_default)
+
+    def test_custom_n_estimators(self):
+        """n_estimators を変更 → スコア形状は正しい."""
+        baseline = np.array([10.0, 11.0, 10.5, 10.8, 10.2]).reshape(-1, 1)
+        all_data = np.array([10.0, 11.0, 50.0]).reshape(-1, 1)
+
+        scores = train_and_score(
+            baseline, all_data, anomaly_params={"n_estimators": 50}
+        )
+
+        assert scores.shape == (3,)
+        assert np.all(np.isfinite(scores))
+
+    def test_custom_contamination(self):
+        """contamination を数値で指定 → 正常動作."""
+        rng = np.random.default_rng(0)
+        normal = 10.0 + rng.normal(0, 0.3, size=200)
+        baseline = normal.reshape(-1, 1)
+        all_data = np.append(normal, [1000.0]).reshape(-1, 1)
+
+        scores = train_and_score(
+            baseline, all_data, anomaly_params={"contamination": 0.1}
+        )
+
+        assert scores.shape == (201,)
+        assert np.all(np.isfinite(scores))
+
+    def test_custom_max_samples(self):
+        """max_samples を整数で指定 → 正常動作."""
+        baseline = np.array([10.0, 11.0, 10.5, 10.8, 10.2]).reshape(-1, 1)
+        all_data = np.array([10.0, 11.0, 50.0]).reshape(-1, 1)
+
+        scores = train_and_score(
+            baseline, all_data, anomaly_params={"max_samples": 3}
+        )
+
+        assert scores.shape == (3,)
+        assert np.all(np.isfinite(scores))
+
+    def test_partial_params_merged_with_defaults(self):
+        """一部のみ指定 → 未指定はデフォルト値が使われる."""
+        baseline = np.array([10.0, 11.0, 10.5, 10.8, 10.2]).reshape(-1, 1)
+        all_data = np.array([10.0, 11.0, 50.0]).reshape(-1, 1)
+
+        scores = train_and_score(
+            baseline, all_data, anomaly_params={"n_estimators": 200}
+        )
+
+        assert scores.shape == (3,)
+        assert np.all(np.isfinite(scores))
