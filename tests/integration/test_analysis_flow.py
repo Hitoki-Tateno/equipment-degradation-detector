@@ -613,11 +613,12 @@ class TestFeatureRegistryEndpoint:
         assert "raw_work_time" in feature_types
 
     def test_each_feature_has_required_fields(self, client):
-        """各特徴量に feature_type, label, params_schema が含まれる."""
+        """各特徴量に必須フィールドが含まれる."""
         resp = client.get("/api/features/registry")
         for feat in resp.json()["features"]:
             assert "feature_type" in feat
             assert "label" in feat
+            assert "description" in feat
             assert "params_schema" in feat
 
 

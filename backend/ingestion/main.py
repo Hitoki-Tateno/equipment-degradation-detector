@@ -434,10 +434,11 @@ async def get_feature_registry():
         "features": [
             {
                 "feature_type": key,
-                "label": key,
-                "params_schema": {},
+                "label": entry["label"],
+                "description": entry["description"],
+                "params_schema": entry["params_schema"],
             }
-            for key in FEATURE_REGISTRY
+            for key, entry in FEATURE_REGISTRY.items()
         ]
     }
 

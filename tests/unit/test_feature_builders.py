@@ -70,7 +70,20 @@ class TestFeatureRegistry:
     def test_raw_work_time_registered(self):
         """'raw_work_time' がレジストリに存在."""
         assert "raw_work_time" in FEATURE_REGISTRY
-        assert FEATURE_REGISTRY["raw_work_time"] is RawWorkTimeFeatureBuilder
+
+    def test_registry_entry_has_builder(self):
+        """エントリに builder クラスが含まれる."""
+        entry = FEATURE_REGISTRY["raw_work_time"]
+        assert entry["builder"] is RawWorkTimeFeatureBuilder
+
+    def test_registry_entry_has_metadata(self):
+        """エントリに label, description, params_schema."""
+        entry = FEATURE_REGISTRY["raw_work_time"]
+        assert isinstance(entry["label"], str)
+        assert len(entry["label"]) > 0
+        assert isinstance(entry["description"], str)
+        assert len(entry["description"]) > 0
+        assert isinstance(entry["params_schema"], dict)
 
 
 class TestCreateFeatureBuilder:

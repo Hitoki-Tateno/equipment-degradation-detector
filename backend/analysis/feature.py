@@ -43,12 +43,18 @@ class CompositeFeatureBuilder(FeatureBuilder):
         return np.hstack(arrays)
 
 
-FEATURE_REGISTRY: dict[str, type[FeatureBuilder]] = {
-    "raw_work_time": RawWorkTimeFeatureBuilder,
+FEATURE_REGISTRY: dict[str, dict] = {
+    "raw_work_time": {
+        "builder": RawWorkTimeFeatureBuilder,
+        "label": "作業時間（生値）",
+        "description": "作業時間の生値をそのまま特徴量として使用する",
+        "params_schema": {},
+    },
 }
 """利用可能な特徴量ビルダーのレジストリ。
 
-キーは feature_type 文字列、値はビルダークラス。
+キーは feature_type 文字列、値はメタデータ付き dict。
+各エントリ: builder, label, description, params_schema。
 新しい特徴量を追加する際はここに登録するだけで
 API・ファクトリに自動反映される。
 """
@@ -71,10 +77,10 @@ def create_feature_builder(config: FeatureConfig) -> FeatureBuilder:
 
     builders: list[FeatureBuilder] = []
     for spec in config.features:
-        cls = FEATURE_REGISTRY.get(spec.feature_type)
-        if cls is None:
+        entry = FEATURE_REGISTRY.get(spec.feature_type)
+        if entry is None:
             raise ValueError(f"Unknown feature type: {spec.feature_type}")
-        builders.append(cls(**spec.params))
+        builders.append(entry["builder"](**spec.params))
 
     if len(builders) == 1:
         return builders[0]
