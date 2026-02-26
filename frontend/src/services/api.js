@@ -21,7 +21,6 @@ const client = axios.create({ baseURL: '/api' });
  * @typedef {Object} TrendResult
  * @property {number} slope
  * @property {number} intercept
- * @property {boolean} is_warning
  */
 
 /**
@@ -48,7 +47,6 @@ const client = axios.create({ baseURL: '/api' });
  * @typedef {Object} DashboardCategorySummary
  * @property {number} category_id
  * @property {string} category_path
- * @property {TrendResult|null} trend
  * @property {number} anomaly_count
  * @property {string} baseline_status - "configured" | "unconfigured"
  */

@@ -89,7 +89,6 @@ class TrendResultResponse(BaseModel):
 
     slope: float
     intercept: float
-    is_warning: bool
 
 
 class AnomalyResultResponse(BaseModel):
@@ -144,7 +143,6 @@ class DashboardCategorySummary(BaseModel):
 
     category_id: int
     category_path: str
-    trend: TrendResultResponse | None
     anomaly_count: int
     baseline_status: str  # "configured" | "unconfigured"
 
@@ -317,7 +315,6 @@ async def get_results(
         "trend": TrendResultResponse(
             slope=trend.slope,
             intercept=trend.intercept,
-            is_warning=trend.is_warning,
         )
         if trend
         else None,
@@ -420,7 +417,6 @@ async def get_dashboard_summary(
 
     summaries = []
     for cat_id, cat_path in leaves:
-        trend = result_store.get_trend_result(cat_id)
         anomalies = result_store.get_anomaly_results(cat_id)
         model_def = result_store.get_model_definition(cat_id)
 
@@ -428,13 +424,6 @@ async def get_dashboard_summary(
             DashboardCategorySummary(
                 category_id=cat_id,
                 category_path=cat_path,
-                trend=TrendResultResponse(
-                    slope=trend.slope,
-                    intercept=trend.intercept,
-                    is_warning=trend.is_warning,
-                )
-                if trend
-                else None,
                 anomaly_count=len(anomalies),
                 baseline_status="configured"
                 if model_def is not None
