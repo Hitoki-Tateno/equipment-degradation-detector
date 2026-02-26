@@ -38,8 +38,8 @@ CREATE TABLE IF NOT EXISTS trend_results (
     id           INTEGER PRIMARY KEY AUTOINCREMENT,
     category_id  INTEGER NOT NULL UNIQUE,
     slope        REAL NOT NULL,
-    intercept    REAL NOT NULL,
-    is_warning   BOOLEAN NOT NULL
+    intercept    REAL NOT NULL
+    -- is_warning は廃止済み（ADR: analysis_ui_redesign.md 決定1）
 );
 
 CREATE TABLE IF NOT EXISTS anomaly_results (
@@ -59,7 +59,8 @@ CREATE TABLE IF NOT EXISTS model_definitions (
     baseline_start  TIMESTAMP NOT NULL,
     baseline_end    TIMESTAMP NOT NULL,
     sensitivity     REAL NOT NULL,
-    excluded_points TEXT DEFAULT '[]'
+    excluded_points TEXT DEFAULT '[]',
+    feature_config  TEXT DEFAULT NULL  -- FeatureConfigのJSONシリアライズ（ADR: analysis_ui_redesign.md 決定3）
 );
 ```
 
@@ -75,12 +76,13 @@ DO UPDATE SET anomaly_score = excluded.anomaly_score;
 ### model_definitionsのupsert文
 
 ```sql
-INSERT INTO model_definitions (category_id, baseline_start, baseline_end, sensitivity, excluded_points)
-VALUES (?, ?, ?, ?, ?)
+INSERT INTO model_definitions (category_id, baseline_start, baseline_end, sensitivity, excluded_points, feature_config)
+VALUES (?, ?, ?, ?, ?, ?)
 ON CONFLICT(category_id)
 DO UPDATE SET
     baseline_start = excluded.baseline_start,
     baseline_end = excluded.baseline_end,
     sensitivity = excluded.sensitivity,
-    excluded_points = excluded.excluded_points;
+    excluded_points = excluded.excluded_points,
+    feature_config = excluded.feature_config;
 ```

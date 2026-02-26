@@ -8,7 +8,7 @@ class TrendResult:
     category_id: int
     slope: float           # 回帰直線の傾き
     intercept: float       # 切片
-    is_warning: bool       # 警告フラグ
+    # is_warning は廃止済み（ADR: analysis_ui_redesign.md 決定1）
 
 @dataclass(frozen=True)
 class AnomalyResult:
@@ -23,6 +23,7 @@ class ModelDefinition:
     baseline_end: datetime
     sensitivity: float     # UIスライダー値（contamination相当）
     excluded_points: list[datetime]  # ベースラインから除外する点
+    feature_config: FeatureConfig | None = None  # 特徴量設定（JSONで永続化）
 ```
 
 ## メソッド契約
@@ -42,6 +43,7 @@ class ModelDefinition:
 
 - category_idで一意。保存は上書き
 - excluded_pointsはJSON配列としてTEXTカラムに保存
+- feature_configはJSON文字列としてTEXTカラムに保存（NULLable）
 - 存在しないcategory_idに対してはNoneを返す
 
 ### delete_model_definition

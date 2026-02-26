@@ -60,7 +60,7 @@
 ```
 レスポンス:
   {
-    "trend": { "slope": 0.05, "intercept": 10.0, "is_warning": false },
+    "trend": { "slope": 0.05, "intercept": 10.0 },
     "anomalies": [{ "recorded_at": "2025-01-01T00:00:00", "anomaly_score": 0.65 }]
   }
 
@@ -71,22 +71,23 @@
 
 ```
 レスポンス:
-  { "baseline_start": "...", "baseline_end": "...", "sensitivity": 0.5, "excluded_points": ["2025-03-15T00:00:00"] }
+  { "baseline_start": "...", "baseline_end": "...", "sensitivity": 0.5, "excluded_points": ["2025-03-15T00:00:00"], "feature_config": { "features": [{ "feature_type": "raw_work_time", "params": {} }] } }
 
-備考: 未定義の場合は 404
+備考: 未定義の場合は 404。feature_config は null の場合あり（デフォルト特徴量を使用）
 ```
 
 ## PUT /api/models/{category_id}（モデル定義作成）
 
 ```
 リクエスト:
-  { "baseline_start": "...", "baseline_end": "...", "sensitivity": 0.5, "excluded_points": ["2025-03-15T00:00:00"] }
+  { "baseline_start": "...", "baseline_end": "...", "sensitivity": 0.5, "excluded_points": ["2025-03-15T00:00:00"], "feature_config": { "features": [{ "feature_type": "raw_work_time", "params": {} }] } }
 
 レスポンス:
   { "created": true }
 
 振る舞い:
   - モデル定義を保存（既存があれば上書き）
+  - feature_config はオプション（null可、省略時はデフォルト特徴量）
   - IsolationForestの学習を実行し、anomaly_scoresを結果ストアに保存
   - 「更新」の概念はない。変更時はDELETE→PUTで再作成する
 ```
@@ -124,14 +125,12 @@
       {
         "category_id": 1,
         "category_path": "大分類 > 中分類",
-        "trend": { "slope": 0.05, "intercept": 10.0, "is_warning": false },
         "anomaly_count": 3,
         "baseline_status": "configured"
       },
       {
         "category_id": 2,
         "category_path": "大分類 > 別分類",
-        "trend": null,
         "anomaly_count": 0,
         "baseline_status": "unconfigured"
       }
@@ -141,9 +140,31 @@
 振る舞い:
   - 全リーフカテゴリのサマリーを一括返却（中間ノードは含まない）
   - category_path はサーバー側で " > " 区切りで組み立て
-  - trend は未計算なら null
+  - trend フィールドは廃止（ADR: analysis_ui_redesign.md 決定1）
   - anomaly_count は異常スコアの件数（リスト全体ではなく件数のみ）
   - baseline_status は "configured"（モデル定義あり）/ "unconfigured"（なし）
+```
+
+## GET /api/features/registry（特徴量一覧API）
+
+```
+レスポンス:
+  {
+    "features": [
+      {
+        "feature_type": "raw_work_time",
+        "label": "生の作業時間",
+        "description": "作業時間をそのまま特徴量として使用（デフォルト）",
+        "params_schema": {}
+      }
+    ]
+  }
+
+振る舞い:
+  - FEATURE_REGISTRY に登録された全特徴量の一覧を返す
+  - params_schema は各特徴量が受け付けるパラメータのスキーマ（空の場合はパラメータなし）
+  - フロントエンドの FeatureSelector が起動時に取得し、チェックボックスUI を動的構築
+  - ADR: analysis_ui_redesign.md 決定3
 ```
 
 ## GET /api/events（SSEストリーム）

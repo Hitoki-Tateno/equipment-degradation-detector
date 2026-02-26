@@ -11,7 +11,9 @@ import createPlotlyComponent from 'react-plotly.js/factory';
 
 const Plot = createPlotlyComponent(Plotly);
 
-const PLOT_STYLE = { width: '100%', height: '400px' };
+// サブチャート表示時は560px、非表示時は400px
+const PLOT_STYLE_WITH_SUB = { width: '100%', height: '560px' };
+const PLOT_STYLE_NO_SUB = { width: '100%', height: '400px' };
 
 function WorkTimePlot({
   records, trend, anomalies, sensitivity,
@@ -133,7 +135,30 @@ const handleRelayout = useCallback((update) => {
 }, []);
 ```
 
-## マーカーの色分け（異常スコア × 感度 × 除外状態）
+## マーカーの色分け（除外状態のみ）
+
+メイン散布図ではanomalyによる色分けを廃止し、全ポイントを同一色にする。異常スコアの可視化はサブチャートで行う（ADR: analysis_ui_redesign.md 決定2）。
+
+```jsx
+// メイン散布図: 除外=グレー(#bfbfbf), それ以外=青(#1890ff)（anomaly色分け廃止）
+const markerColors = useMemo(() => {
+  return records.map((_, i) => {
+    if (excludedIndices && excludedIndices.includes(i)) return '#bfbfbf';
+    return '#1890ff';
+  });
+}, [records, excludedIndices]);
+
+// 除外ポイントは×マーカー、それ以外は○
+const markerSymbols = useMemo(() => {
+  return records.map((_, i) =>
+    excludedIndices && excludedIndices.includes(i) ? 'x' : 'circle',
+  );
+}, [records, excludedIndices]);
+```
+
+## 異常スコアサブチャート + 動的閾値ライン
+
+メイン散布図の下部にPlotlyサブプロットとして異常スコアを表示する。共有X軸でズーム/パン同期。
 
 ```jsx
 // 感度値から閾値を算出（スコアが閾値超過で異常と判定。スコアは0〜1、1に近いほど異常）
@@ -145,23 +170,41 @@ function computeThreshold(sensitivity, anomalies) {
   return max - sensitivity * (max - min);
 }
 
-// 各ポイントの色: 除外=グレー(#bfbfbf), 異常=赤(#ff4d4f), 正常=青(#1890ff)
-const markerColors = useMemo(() => {
-  return records.map((r, i) => {
-    if (excludedIndices && excludedIndices.includes(i)) return '#bfbfbf';
-    const score = anomalyMap[r.recorded_at];
-    if (score !== undefined && score > threshold) return '#ff4d4f';
-    return '#1890ff';
-  });
-}, [records, excludedIndices, anomalyMap, threshold]);
-
-// 除外ポイントは×マーカー、それ以外は○
-const markerSymbols = useMemo(() => {
-  return records.map((_, i) =>
-    excludedIndices && excludedIndices.includes(i) ? 'x' : 'circle',
+// サブチャートのマーカー色: 閾値超過=赤(#ff4d4f), 以下=青(#1890ff)
+const subChartColors = useMemo(() => {
+  return anomalies.map((a) =>
+    a.anomaly_score > threshold ? '#ff4d4f' : '#1890ff',
   );
-}, [records, excludedIndices]);
+}, [anomalies, threshold]);
+
+// サブチャートtrace（yaxis: 'y2'）
+const anomalyTrace = {
+  x: anomalies.map((a) => a.recorded_at),
+  y: anomalies.map((a) => a.anomaly_score),
+  type: 'scattergl', mode: 'markers', yaxis: 'y2',
+  marker: { color: subChartColors, size: 6 },
+  name: '異常スコア',
+};
+
+// レイアウト: サブプロット配置
+const layout = {
+  yaxis:  { domain: [0.33, 1.0], title: '作業時間 t (秒)' },
+  yaxis2: { domain: [0.0, 0.23], range: [0, 1.05], anchor: 'x', title: '異常スコア' },
+  // 動的閾値ライン（layout.shapes）
+  shapes: [
+    ...baselineShapes,
+    {
+      type: 'line', xref: 'paper', yref: 'y2',
+      x0: 0, x1: 1, y0: threshold, y1: threshold,
+      line: { color: '#ff4d4f', width: 1.5, dash: 'dash' },
+    },
+  ],
+};
 ```
+
+**制約**: `plotly.js-gl2d-dist` v3.3.1は `bar` トレースを含まない → `scattergl` markerで代替。
+
+**クリックガード**: `handleClick` で `curveNumber === 0`（メインtrace）のみ除外操作を許可。サブチャートのクリックは無視する。
 
 ## 回帰直線の重ね描き
 
