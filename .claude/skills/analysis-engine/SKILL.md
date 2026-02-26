@@ -38,32 +38,66 @@ class AnalysisEngine:
 
 ## 特徴量構築（FeatureBuilder）
 
-特徴ベクトルの構築方法は差し替え可能な構造にする:
+特徴ベクトルの構築方法は差し替え可能な構造にする。ユーザーがUIから複数の特徴量を自由に組み合わせ可能（ADR: analysis_ui_redesign.md 決定3）。
 
-- 契約: `backend/interfaces/feature.py` — `FeatureBuilder` ABC
-- 実装: `backend/analysis/feature.py` — `RawWorkTimeFeatureBuilder`
+- 契約: `backend/interfaces/feature.py` — `FeatureBuilder` ABC, `FeatureSpec`, `FeatureConfig`
+- 実装: `backend/analysis/feature.py` — `RawWorkTimeFeatureBuilder`, 各種ビルダー, `CompositeFeatureBuilder`
 
 ```python
 # backend/interfaces/feature.py
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
+from dataclasses import dataclass, field
+from datetime import datetime
 import numpy as np
 
 class FeatureBuilder(ABC):
     """Template Method: build() が ndim=2 を検証し、_build_impl() を呼ぶ。"""
-    def build(self, work_times: Sequence[float]) -> np.ndarray: ...
+    def build(self, work_times: Sequence[float],
+              timestamps: Sequence[datetime] | None = None) -> np.ndarray: ...
 
     @abstractmethod
-    def _build_impl(self, work_times: Sequence[float]) -> np.ndarray: ...
+    def _build_impl(self, work_times: Sequence[float],
+                    timestamps: Sequence[datetime] | None = None) -> np.ndarray: ...
+
+@dataclass(frozen=True)
+class FeatureSpec:
+    feature_type: str       # FEATURE_REGISTRYのキー
+    params: dict = field(default_factory=dict)
+
+@dataclass(frozen=True)
+class FeatureConfig:
+    features: list[FeatureSpec]
 
 # backend/analysis/feature.py
 class RawWorkTimeFeatureBuilder(FeatureBuilder):
     """生の作業時間を特徴量行列にする（デフォルト、d=1）。"""
-    def _build_impl(self, work_times):
+    def _build_impl(self, work_times, timestamps=None):
         return np.array(list(work_times)).reshape(-1, 1)
+
+class CompositeFeatureBuilder(FeatureBuilder):
+    """複数ビルダーの出力をnp.hstackで結合する。"""
+    def __init__(self, builders: list[FeatureBuilder]):
+        self._builders = builders
+
+    def _build_impl(self, work_times, timestamps=None):
+        arrays = [b.build(work_times, timestamps) for b in self._builders]
+        return np.hstack(arrays)
+
+# ファクトリ
+FEATURE_REGISTRY: dict[str, type[FeatureBuilder]] = {
+    "raw_work_time": RawWorkTimeFeatureBuilder,
+    # 具体的な特徴量は今後選定して追加
+}
+
+def create_feature_builder(config: FeatureConfig | None) -> FeatureBuilder:
+    """FeatureConfigからCompositeFeatureBuilderを動的構築。Noneならデフォルト。"""
+    ...
 ```
 
-ユーザーには公開しない。変更は運用判断でシステム側が行う。
+### AnalysisEngineでの利用
+
+`model_def.feature_config` があれば `create_feature_builder()` で動的生成、なければ `RawWorkTimeFeatureBuilder` にフォールバック。`timestamps` もビルダーに渡す。
 
 ## Isolation Forestの仕様
 

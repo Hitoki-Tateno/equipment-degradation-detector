@@ -38,12 +38,14 @@ import * as Icons from "@ant-design/icons";
 ## コンポーネント構成
 
 ```
-App.js                          # レイアウト + ビュー切替（dashboard / plot）
+App.js                          # レイアウト + ビュー切替（dashboard / plot / tutorial）
 ├── Dashboard.jsx               # 監視ダッシュボード（カテゴリ一覧テーブル）
 ├── CategoryTree.jsx            # 分類ツリー（サイドバー内、プロットビュー時のみ表示）
-└── PlotView.jsx                # プロットビューコンテナ
-    ├── WorkTimePlot.jsx        # Plotly散布図（メモ化済み）
-    └── BaselineControls.jsx    # ベースライン設定操作パネル
+├── PlotView.jsx                # プロットビューコンテナ
+│   ├── WorkTimePlot.jsx        # Plotly散布図 + 異常スコアサブチャート（メモ化済み）
+│   └── BaselineControls.jsx    # ベースライン設定操作パネル
+│       └── FeatureSelector.jsx # 特徴量チェックボックス選択（Checkbox.Group）
+└── TutorialPage.jsx            # 特徴量チュートリアルページ（学習専用）
 
 hooks/
 ├── useBaselineManager.js       # ベースライン状態管理 + API操作
@@ -51,13 +53,14 @@ hooks/
 
 services/api.js                 # axios APIクライアント
 utils/categoryUtils.js          # カテゴリツリーのフラット化ユーティリティ
+utils/featureTransforms.js      # JS版特徴量変換（チュートリアル表示専用）
 ```
 
 ### 状態管理の責務分担
 
 | 状態 | 管理場所 | 説明 |
 |------|---------|------|
-| `currentView` | App.js | `'dashboard'` / `'plot'` ビュー切替 |
+| `currentView` | App.js | `'dashboard'` / `'plot'` / `'tutorial'` ビュー切替 |
 | `categories` | App.js | カテゴリツリー（初回マウント時に取得） |
 | `selectedCategoryId` | App.js | 選択中のカテゴリID |
 | `siderWidth` / `isDragging` | useResizable hook | サイドバー幅のドラッグリサイズ |
@@ -65,6 +68,7 @@ utils/categoryUtils.js          # カテゴリツリーのフラット化ユー�
 | `baselineStatus` / `baselineRange` | useBaselineManager | ベースライン設定状態 |
 | `interactionMode` | useBaselineManager | `'select'` / `'operate'` モード |
 | `sensitivity` / `excludedIndices` | useBaselineManager | 感度・除外点設定 |
+| `featureConfig` | useBaselineManager | 特徴量設定（save時にベースライン設定と一括送信） |
 | `axisRange` | PlotView.jsx | ズーム/パン状態の保持（モード切替時に維持） |
 
 ## Ant Designコンポーネントの対応
@@ -80,6 +84,8 @@ utils/categoryUtils.js          # カテゴリツリーのフラット化ユー�
 | 警告表示 | `Alert` / `Tag` | Dashboard.jsx, BaselineControls.jsx |
 | 確認ダイアログ | `Modal.confirm` | BaselineControls.jsx, Dashboard.jsx |
 | 読み込み中 | `Spin` / `Empty` | PlotView.jsx, App.js |
+| 特徴量チェックボックス | `Checkbox.Group` | FeatureSelector.jsx |
+| 特徴量カード | `Card` | TutorialPage.jsx |
 
 ## 用語規約（重要）
 
@@ -129,16 +135,18 @@ APIを叩かずにフロントエンドだけで完結する:
 ```
 GET /api/results/{category_id} → anomaly_scores取得
   → Slider操作 → sensitivity値から閾値計算
-  → 各点のanomaly_scoreと閾値比較
-  → プロット色分け更新（useMemo → React.memo で差分レンダリング）
+  → 異常スコアサブチャートの動的閾値ラインが移動（layout.shapes更新）
+  → サブチャートのポイント色が閾値で切り替わる（useMemo → React.memo で差分レンダリング）
 ```
+
+※ メイン散布図のポイント色分け（anomaly→赤）は廃止済み。異常の可視化はサブチャートで行う（ADR: analysis_ui_redesign.md 決定2）。
 
 ## レイアウト
 
-- **ヘッダー**: 固定上部。ナビゲーションMenu（ダッシュボード / プロット切替）
+- **ヘッダー**: 固定上部。ナビゲーションMenu（ダッシュボード / プロット / チュートリアル切替）
 - **サイドバー**: プロットビュー時のみ表示。折りたたみ可能。**ドラッグでリサイズ可能**（200px〜500px、デフォルト280px）
 - **独立スクロール**: サイドバーとメインコンテンツは個別にスクロール（`overflow-y: auto` + `height: calc(100vh - 64px)`）
-- **ビュー切替**: 条件付きレンダリング（`currentView === 'dashboard' ? <Dashboard /> : <PlotView />`）
+- **ビュー切替**: 条件付きレンダリング（`currentView` に応じて `<Dashboard />` / `<PlotView />` / `<TutorialPage />` を表示）
 
 ## メモ化の規約
 
@@ -176,7 +184,7 @@ const loadDashboardData = useCallback(async () => {
     key: s.category_id,
     categoryId: s.category_id,
     categoryPath: s.category_path,
-    trend: s.trend,
+    // trend はダッシュボードから廃止（ADR: analysis_ui_redesign.md 決定1）
     anomalyCount: s.anomaly_count,
     baselineStatus: s.baseline_status,
   })));
