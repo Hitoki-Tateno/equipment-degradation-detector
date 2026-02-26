@@ -140,3 +140,12 @@ export async function triggerAnalysis() {
   const { data } = await client.post('/analysis/run');
   return data;
 }
+
+/**
+ * GET /api/features/registry
+ * @returns {Promise<Array<{feature_type: string, label: string, description: string, params_schema: Object}>>}
+ */
+export async function fetchFeatureRegistry() {
+  const { data } = await client.get('/features/registry');
+  return data.features;
+}

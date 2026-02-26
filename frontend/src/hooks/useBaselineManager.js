@@ -19,6 +19,7 @@ const INITIAL_STATE = {
   baselineRange: null,            // { start, end } | null
   excludedIndices: [],
   sensitivity: INITIAL_SENSITIVITY,
+  featureConfig: null,              // [{ feature_type, params }] | null
   // UI
   interactionMode: 'select',     // 'select' | 'operate'
   loadingRecords: false,
@@ -45,6 +46,7 @@ const A = {
   DELETE_RESULTS_UPDATED: 'DELETE_RESULTS_UPDATED',
   DELETE_ERROR: 'DELETE_ERROR',
   CLEAR_ERROR: 'CLEAR_ERROR',
+  SET_FEATURE_CONFIG: 'SET_FEATURE_CONFIG',
 };
 
 /**
@@ -75,6 +77,7 @@ export function reducer(state, action) {
         baselineRange: { start: action.baseline_start, end: action.baseline_end },
         sensitivity: action.sensitivity,
         excludedIndices: action.excludedIndices,
+        featureConfig: action.featureConfig,
         interactionMode: 'operate',
       };
 
@@ -134,6 +137,7 @@ export function reducer(state, action) {
         baselineRange: null,
         excludedIndices: [],
         sensitivity: INITIAL_SENSITIVITY,
+        featureConfig: null,
         anomalies: [],
         interactionMode: 'select',
       };
@@ -150,6 +154,9 @@ export function reducer(state, action) {
 
     case A.CLEAR_ERROR:
       return { ...state, error: null };
+
+    case A.SET_FEATURE_CONFIG:
+      return { ...state, featureConfig: action.featureConfig };
 
     default:
       return state;
@@ -199,6 +206,7 @@ export function useBaselineManager(categoryId) {
             baseline_end: cfg.baseline_end,
             sensitivity: cfg.sensitivity,
             excludedIndices,
+            featureConfig: cfg.feature_config || null,
           });
         } catch (err) {
           if (cancelled) return;
@@ -230,6 +238,7 @@ export function useBaselineManager(categoryId) {
         baseline_end: state.baselineRange.end,
         sensitivity: state.sensitivity,
         excluded_points: excludedPoints,
+        feature_config: state.featureConfig,
       });
       const results = await fetchResults(categoryId);
       dispatch({
@@ -240,7 +249,7 @@ export function useBaselineManager(categoryId) {
     } catch (err) {
       dispatch({ type: A.SAVE_ERROR, error: `設定保存エラー: ${err.message}` });
     }
-  }, [categoryId, state.baselineRange, state.excludedIndices, state.sensitivity, state.records]);
+  }, [categoryId, state.baselineRange, state.excludedIndices, state.sensitivity, state.featureConfig, state.records]);
 
   // ベースライン設定を削除し、状態を初期化
   const deleteBaseline = useCallback(async () => {
@@ -275,6 +284,10 @@ export function useBaselineManager(categoryId) {
     dispatch({ type: A.SET_SENSITIVITY, sensitivity });
   }, []);
 
+  const setFeatureConfig = useCallback((featureConfig) => {
+    dispatch({ type: A.SET_FEATURE_CONFIG, featureConfig });
+  }, []);
+
   const clearError = useCallback(() => {
     dispatch({ type: A.CLEAR_ERROR });
   }, []);
@@ -289,6 +302,8 @@ export function useBaselineManager(categoryId) {
     excludedIndices: state.excludedIndices,
     sensitivity: state.sensitivity,
     setSensitivity,
+    featureConfig: state.featureConfig,
+    setFeatureConfig,
     savingBaseline: state.savingBaseline,
     interactionMode: state.interactionMode,
     setInteractionMode,
