@@ -51,14 +51,13 @@ class AnalysisEngine:
         n_values = np.arange(1, len(records) + 1)
         work_times = np.array([r.work_time for r in records])
 
-        slope, intercept, is_warning = compute_trend(n_values, work_times)
+        slope, intercept = compute_trend(n_values, work_times)
 
         self._result_store.save_trend_result(
             TrendResult(
                 category_id=category_id,
                 slope=slope,
                 intercept=intercept,
-                is_warning=is_warning,
             )
         )
 

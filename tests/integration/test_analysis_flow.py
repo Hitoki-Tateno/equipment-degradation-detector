@@ -486,8 +486,8 @@ class TestDashboardSummary:
         assert "A > X" in paths
         assert "A > Y" in paths
 
-    def test_includes_trend_data(self, client):
-        """トレンド分析結果がサマリーに含まれる。"""
+    def test_includes_anomaly_count(self, client):
+        """異常検出数がサマリーに含まれる。"""
         client.post(
             "/api/records",
             json={
@@ -507,10 +507,8 @@ class TestDashboardSummary:
         )
         resp = client.get("/api/dashboard/summary")
         cat = resp.json()["categories"][0]
-        assert cat["trend"] is not None
-        assert "slope" in cat["trend"]
-        assert "intercept" in cat["trend"]
-        assert "is_warning" in cat["trend"]
+        assert "anomaly_count" in cat
+        assert isinstance(cat["anomaly_count"], int)
 
     def test_baseline_status_configured(self, client):
         """モデル定義済み → baseline_status = "configured"。"""

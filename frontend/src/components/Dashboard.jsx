@@ -35,7 +35,6 @@ function Dashboard({ active, categories, onNavigateToPlot }) {
           key: s.category_id,
           categoryId: s.category_id,
           categoryPath: s.category_path,
-          trend: s.trend,
           anomalyCount: s.anomaly_count,
           baselineStatus: s.baseline_status,
         })),
@@ -106,7 +105,6 @@ function Dashboard({ active, categories, onNavigateToPlot }) {
         row.categoryId === categoryId
           ? {
               ...row,
-              trend: results.status === 'fulfilled' ? results.value.trend : null,
               anomalyCount:
                 results.status === 'fulfilled'
                   ? (results.value.anomalies || []).length
@@ -163,28 +161,16 @@ function Dashboard({ active, categories, onNavigateToPlot }) {
         onFilter: (value, record) => record.baselineStatus === value,
       },
       {
-        title: 'トレンド警告',
-        dataIndex: 'trend',
-        key: 'warning',
-        render: (trend) => {
-          if (!trend) return <Tag>未分析</Tag>;
-          return trend.is_warning ? (
-            <Tag color="red">警告</Tag>
+        title: '異常検出数',
+        dataIndex: 'anomalyCount',
+        key: 'anomalyCount',
+        render: (count) =>
+          count > 0 ? (
+            <Tag color="red">{count} 件</Tag>
           ) : (
-            <Tag color="green">正常</Tag>
-          );
-        },
-      },
-      {
-        title: '傾き (slope)',
-        dataIndex: 'trend',
-        key: 'slope',
-        render: (trend) => (trend ? trend.slope.toFixed(4) : '-'),
-        sorter: (a, b) => {
-          const sa = a.trend ? a.trend.slope : 0;
-          const sb = b.trend ? b.trend.slope : 0;
-          return sa - sb;
-        },
+            <Tag color="green">0 件</Tag>
+          ),
+        sorter: (a, b) => a.anomalyCount - b.anomalyCount,
       },
       {
         title: '操作',

@@ -16,7 +16,6 @@ class TrendResult:
     category_id: int
     slope: float
     intercept: float
-    is_warning: bool
 
 
 @dataclass(frozen=True)

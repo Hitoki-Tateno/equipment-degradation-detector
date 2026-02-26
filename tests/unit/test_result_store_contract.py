@@ -27,35 +27,28 @@ class TestTrendResults:
     """トレンド分析結果の契約テスト。"""
 
     def test_save_and_get(self, result_store: ResultStoreInterface):
-        result = TrendResult(
-            category_id=1, slope=0.5, intercept=10.0, is_warning=False
-        )
+        result = TrendResult(category_id=1, slope=0.5, intercept=10.0)
         result_store.save_trend_result(result)
 
         loaded = result_store.get_trend_result(1)
         assert loaded is not None
         assert loaded.slope == 0.5
         assert loaded.intercept == 10.0
-        assert loaded.is_warning is False
 
     def test_overwrite_on_same_category(
         self, result_store: ResultStoreInterface
     ):
         result_store.save_trend_result(
-            TrendResult(
-                category_id=1, slope=0.5, intercept=10.0, is_warning=False
-            )
+            TrendResult(category_id=1, slope=0.5, intercept=10.0)
         )
         result_store.save_trend_result(
-            TrendResult(
-                category_id=1, slope=1.0, intercept=20.0, is_warning=True
-            )
+            TrendResult(category_id=1, slope=1.0, intercept=20.0)
         )
 
         loaded = result_store.get_trend_result(1)
         assert loaded is not None
         assert loaded.slope == 1.0
-        assert loaded.is_warning is True
+        assert loaded.intercept == 20.0
 
     def test_returns_none_for_missing(
         self, result_store: ResultStoreInterface

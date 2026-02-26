@@ -16,8 +16,7 @@ CREATE TABLE IF NOT EXISTS trend_results (
     id           INTEGER PRIMARY KEY AUTOINCREMENT,
     category_id  INTEGER NOT NULL UNIQUE,
     slope        REAL NOT NULL,
-    intercept    REAL NOT NULL,
-    is_warning   BOOLEAN NOT NULL
+    intercept    REAL NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS anomaly_results (
@@ -69,24 +68,22 @@ class SqliteResultStore(ResultStoreInterface):
             self._conn.execute(
                 """
                 INSERT INTO trend_results
-                    (category_id, slope, intercept, is_warning)
-                VALUES (?, ?, ?, ?)
+                    (category_id, slope, intercept)
+                VALUES (?, ?, ?)
                 ON CONFLICT(category_id)
                 DO UPDATE SET slope = excluded.slope,
-                              intercept = excluded.intercept,
-                              is_warning = excluded.is_warning
+                              intercept = excluded.intercept
                 """,
                 (
                     result.category_id,
                     result.slope,
                     result.intercept,
-                    result.is_warning,
                 ),
             )
 
     def get_trend_result(self, category_id: int) -> TrendResult | None:
         row = self._conn.execute(
-            "SELECT category_id, slope, intercept, is_warning"
+            "SELECT category_id, slope, intercept"
             " FROM trend_results WHERE category_id = ?",
             (category_id,),
         ).fetchone()
@@ -96,7 +93,6 @@ class SqliteResultStore(ResultStoreInterface):
             category_id=row[0],
             slope=row[1],
             intercept=row[2],
-            is_warning=bool(row[3]),
         )
 
     def save_anomaly_results(self, results: list[AnomalyResult]) -> None:
