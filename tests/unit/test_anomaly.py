@@ -118,7 +118,7 @@ class TestTrainAndScoreAnomalyParams:
 
 
 class TestScoreNormalization:
-    """decision_function 正規化のテスト."""
+    """原論文準拠スコアのテスト."""
 
     def test_scores_in_zero_one_range(self):
         """全スコアが [0, 1] 範囲内."""
@@ -133,8 +133,8 @@ class TestScoreNormalization:
         assert np.all(scores >= 0.0)
         assert np.all(scores <= 1.0)
 
-    def test_contamination_affects_scores(self):
-        """contamination 値が異なる → スコア分布が変わる."""
+    def test_scores_independent_of_contamination(self):
+        """score_samples は contamination に依存しない."""
         rng = np.random.default_rng(42)
         normal = 10.0 + rng.normal(0, 0.3, size=200)
         baseline = normal.reshape(-1, 1)
@@ -147,23 +147,17 @@ class TestScoreNormalization:
             baseline, all_data, anomaly_params={"contamination": 0.1}
         )
 
-        # contamination が高い → 0.5 超のポイントが多い
-        above_low = np.sum(scores_low > 0.5)
-        above_high = np.sum(scores_high > 0.5)
-        assert above_high > above_low
+        np.testing.assert_array_equal(scores_low, scores_high)
 
-    def test_boundary_maps_to_half(self):
-        """contamination 境界が概ね 0.5 にマッピングされる."""
+    def test_normal_data_scores_near_half(self):
+        """正常データのスコアは原論文の性質により 0.5 付近に集中する."""
         rng = np.random.default_rng(0)
         baseline = (10.0 + rng.normal(0, 0.3, size=500)).reshape(-1, 1)
 
-        scores = train_and_score(
-            baseline, baseline, anomaly_params={"contamination": 0.05}
-        )
+        scores = train_and_score(baseline, baseline)
 
-        # ベースライン内で 0.5 超の割合が contamination に近い
-        ratio = np.sum(scores > 0.5) / len(scores)
-        assert 0.01 <= ratio <= 0.15  # 0.05 の前後で許容
+        mean_score = scores.mean()
+        assert 0.35 <= mean_score <= 0.55
 
     def test_all_identical_data(self):
         """全データ同一 → エラーなし、全スコアが有限."""
