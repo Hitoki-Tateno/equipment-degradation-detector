@@ -741,12 +741,12 @@ class TestAnalysisEngineFeatureConfig:
         )
         engine.run(1)
 
-        # 全データで1回だけ build が呼ばれる（インデックス抽出方式）
-        mock_builder.build.assert_called_once()
-        args, kwargs = mock_builder.build.call_args
-        assert len(args) >= 2 or "timestamps" in kwargs
-        timestamps = args[1] if len(args) >= 2 else kwargs["timestamps"]
-        assert all(isinstance(t, datetime) for t in timestamps)
+        assert mock_builder.build.call_count == 2
+        for call in mock_builder.build.call_args_list:
+            args, kwargs = call
+            assert len(args) >= 2 or "timestamps" in kwargs
+            timestamps = args[1] if len(args) >= 2 else kwargs["timestamps"]
+            assert all(isinstance(t, datetime) for t in timestamps)
 
 
 class TestAnalysisEngineAnomalyParams:
