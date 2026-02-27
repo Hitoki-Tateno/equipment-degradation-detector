@@ -13,7 +13,10 @@ const SENSITIVITY_MARKS = {
 
 const STYLE_SPACE_FULL = { width: '100%' };
 const STYLE_TOOLTIP_NULL = { formatter: null };
-const STYLE_HINT_TEXT = { fontSize: 12 };
+const STYLE_HINT_TEXT = { fontSize: 11 };
+const STYLE_SECTION_TITLE = { fontSize: 13 };
+const STYLE_SLIDER_COMPACT = { margin: '4px 0 8px 0' };
+const STYLE_DATE_TEXT = { fontSize: 12 };
 
 function BaselineControls({
   baselineStatus,
@@ -49,7 +52,7 @@ function BaselineControls({
 
   return (
     <div className="baseline-controls">
-      <Space direction="vertical" style={STYLE_SPACE_FULL} size="middle">
+      <Space direction="vertical" style={STYLE_SPACE_FULL} size="small">
         <Space>
           <Text strong>ベースライン設定:</Text>
           {baselineStatus === 'configured' ? (
@@ -60,19 +63,19 @@ function BaselineControls({
         </Space>
 
         {baselineDateDisplay && (
-          <Text type="secondary">
+          <Text type="secondary" style={STYLE_DATE_TEXT}>
             ベースライン期間: {baselineDateDisplay.start} 〜{' '}
             {baselineDateDisplay.end}
           </Text>
         )}
         {!baselineRange && baselineStatus === 'unconfigured' && (
-          <Text type="secondary">
+          <Text type="secondary" style={STYLE_DATE_TEXT}>
             プロット上でドラッグしてベースライン期間を選択してください
           </Text>
         )}
 
         <div>
-          <Text>感度</Text>
+          <Text style={STYLE_SECTION_TITLE}>感度</Text>
           <Slider
             min={0.25}
             max={0.75}
@@ -81,6 +84,7 @@ function BaselineControls({
             value={sensitivity}
             onChange={onSensitivityChange}
             tooltip={STYLE_TOOLTIP_NULL}
+            style={STYLE_SLIDER_COMPACT}
           />
           {!hasAnomalies && (
             <Text type="secondary" style={STYLE_HINT_TEXT}>

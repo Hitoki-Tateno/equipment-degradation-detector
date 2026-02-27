@@ -68,31 +68,37 @@ function PlotView({ categoryId }) {
             options={MODE_OPTIONS}
             style={STYLE_SEGMENTED}
           />
-          <WorkTimePlot
-            records={records}
-            trend={trend}
-            anomalies={anomalies}
-            sensitivity={sensitivity}
-            baselineRange={baselineRange}
-            excludedIndices={excludedIndices}
-            interactionMode={interactionMode}
-            categoryId={categoryId}
-            onBaselineSelect={setBaselineRange}
-            onToggleExclude={toggleExclude}
-          />
-          <BaselineControls
-            baselineStatus={baselineStatus}
-            baselineRange={baselineRange}
-            sensitivity={sensitivity}
-            onSensitivityChange={setSensitivity}
-            registry={registry}
-            featureConfig={featureConfig}
-            onFeatureConfigChange={setFeatureConfig}
-            onSave={saveBaseline}
-            onDelete={deleteBaseline}
-            savingBaseline={savingBaseline}
-            hasAnomalies={anomalies.length > 0}
-          />
+          <div className="plot-settings-row">
+            <div className="plot-area">
+              <WorkTimePlot
+                records={records}
+                trend={trend}
+                anomalies={anomalies}
+                sensitivity={sensitivity}
+                baselineRange={baselineRange}
+                excludedIndices={excludedIndices}
+                interactionMode={interactionMode}
+                categoryId={categoryId}
+                onBaselineSelect={setBaselineRange}
+                onToggleExclude={toggleExclude}
+              />
+            </div>
+            <div className="settings-panel">
+              <BaselineControls
+                baselineStatus={baselineStatus}
+                baselineRange={baselineRange}
+                sensitivity={sensitivity}
+                onSensitivityChange={setSensitivity}
+                registry={registry}
+                featureConfig={featureConfig}
+                onFeatureConfigChange={setFeatureConfig}
+                onSave={saveBaseline}
+                onDelete={deleteBaseline}
+                savingBaseline={savingBaseline}
+                hasAnomalies={anomalies.length > 0}
+              />
+            </div>
+          </div>
         </>
       ) : (
         <Empty description="この分類にはレコードがありません" />
