@@ -62,7 +62,7 @@ Step 1（データ可視化）完了後、Step 2（モデル定義）の実装�
 - サブチャートのトレースタイプ: `scattergl`（`plotly.js-gl2d-dist`にbar未含有のため）
 - 閾値ライン: `layout.shapes`（`xref: 'paper'`で全幅、ズーム追従）
 - X軸共有: `yaxis2.anchor: 'x'` でPlotlyネイティブの同期
-- 閾値計算式: 既存の `max - sensitivity * (max - min)` を維持
+- 閾値計算式: 決定5 で絶対値に変更
 
 **理由**:
 - 異常スコアの数値が直接可視化され、相対的な重大度が明確
@@ -162,6 +162,38 @@ ModelDefinition.anomaly_params (dict|None)
 - `feature_config` の実装パターンに合わせることで一貫性を維持
 - ハードコード値をモジュール定数に抽出し、デフォルト値を明示的に管理
 - API層を変更しないことで、フロントエンドへの影響ゼロで内部拡張性を確保
+
+### 決定5: 異常スコア閾値の絶対値化
+
+**方針**: フロントエンドの閾値計算を相対値（min/maxベース）から絶対値（`threshold = 1.0 - sensitivity`）に変更する。
+
+**背景**:
+- `computeThreshold()` が `max - sensitivity * (max - min)` で閾値を算出しており、スコアの min/max に対する相対値になっている
+- 全データが正常（スコア ≈ 0.4-0.5）でも min/max の差分に基づいて必ず一部が閾値を超え、誤検知が発生する
+- 異常スコアは `-score_samples()` により原論文準拠の 0-1 スケールで保存済み（`sw_architecture_minutes.md` L211-218）
+- 正規化済みのスコアを絶対値として直接判定すべき
+
+**閾値の計算式変更**:
+
+| | 旧（相対値） | 新（絶対値） |
+|---|---|---|
+| 計算式 | `max - sensitivity * (max - min)` | `1.0 - sensitivity` |
+| 入力 | スコアの min/max に依存 | sensitivity のみ |
+| sensitivity=0.25 (低) | データ依存 | threshold = 0.75（スコア > 0.75 のみ異常） |
+| sensitivity=0.50 (中) | データ依存 | threshold = 0.50（原論文の正常/異常境界） |
+| sensitivity=0.75 (高) | データ依存 | threshold = 0.25（広く異常を検出） |
+
+**UXへの影響**:
+- 感度スライダーのラベル・範囲・方向は変更なし（「低/中/高」、0.25-0.75）
+- 「高い感度 = より多くの異常を検出」のUX方向を維持
+- 全データが正常な場合、閾値ラインがスコア群の上方に位置し、誤検知が発生しない
+
+**変更対象**:
+- `frontend/src/components/WorkTimePlot.jsx`: `computeThreshold()` を `return 1.0 - sensitivity;` に簡素化
+
+**理由**:
+- 原論文準拠の 0-1 スケールを既に採用しているため、絶対閾値が最も直接的かつ解釈可能
+- 相対閾値は全データ正常時にも誤検知を生むため、異常検知システムとして不適切
 
 ## 影響範囲
 
