@@ -187,7 +187,7 @@ function WorkTimePlot({
       // scattergl は dragmode:'select' 時のみ stash.xpx/ypx を計算する（plot.js:275-305）。
       // dragmode 変更だけでは editType:'modebar' のため plot 関数が再実行されない。
       // datarevision (editType:'calc') を連動させ、Plotly.react 内で同期的に recalc+replot を強制する。
-      datarevision: interactionMode,
+      datarevision: `${interactionMode}-${threshold}`,
       uirevision: categoryId,
       xaxis: {
         title: '記録日時',
@@ -209,7 +209,7 @@ function WorkTimePlot({
       autosize: true,
       shapes,
     }),
-    [interactionMode, shapes, categoryId, hasAnomalies],
+    [interactionMode, shapes, categoryId, hasAnomalies, threshold],
   );
 
   return (
