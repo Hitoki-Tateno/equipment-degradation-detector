@@ -93,12 +93,20 @@ class AnalysisEngine:
             else:
                 feature_builder = self._feature_builder
 
-            baseline_wt = [r.work_time for r in baseline_records]
             all_wt = [r.work_time for r in records]
-            baseline_ts = [r.recorded_at for r in baseline_records]
             all_ts = [r.recorded_at for r in records]
-            baseline_feat = feature_builder.build(baseline_wt, baseline_ts)
             all_feat = feature_builder.build(all_wt, all_ts)
+
+            # ベースラインをインデックスで抽出（時系列特徴量の一貫性を保証）
+            baseline_set = {
+                r.recorded_at.replace(tzinfo=None) for r in baseline_records
+            }
+            baseline_indices = [
+                i
+                for i, r in enumerate(records)
+                if r.recorded_at.replace(tzinfo=None) in baseline_set
+            ]
+            baseline_feat = all_feat[baseline_indices]
 
             scores = train_and_score(
                 baseline_feat,
