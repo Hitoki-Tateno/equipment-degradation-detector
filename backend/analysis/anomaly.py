@@ -37,13 +37,13 @@ def train_and_score(
     )
     model.fit(baseline_data)
 
-    # decision_function: positive = inlier, negative = outlier (sklearn)
-    # Negate: positive = outlier (our convention)
-    raw = -model.decision_function(all_data)
+    # スケーリング基準をベースライン(学習データ)から算出（固定）
+    baseline_raw = -model.decision_function(baseline_data)
+    pos_max = baseline_raw.max() if baseline_raw.max() > 0 else 1.0
+    neg_min = abs(baseline_raw.min()) if baseline_raw.min() < 0 else 1.0
 
-    # Normalize: 0 → 0.5, max_positive → 1.0, min_negative → 0.0
-    pos_max = raw.max() if raw.max() > 0 else 1.0
-    neg_min = abs(raw.min()) if raw.min() < 0 else 1.0
+    # 全データをスコアリング
+    raw = -model.decision_function(all_data)
     scores = np.where(
         raw >= 0,
         0.5 + 0.5 * raw / pos_max,
