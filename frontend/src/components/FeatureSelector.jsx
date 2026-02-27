@@ -3,8 +3,9 @@ import { Checkbox, InputNumber, Space, Typography } from 'antd';
 
 const { Text } = Typography;
 
-const STYLE_DESCRIPTION = { fontSize: 12, display: 'block', marginLeft: 24 };
-const STYLE_PARAM = { marginLeft: 24, marginTop: 4 };
+const STYLE_DESCRIPTION = { fontSize: 11, display: 'block', marginLeft: 22 };
+const STYLE_PARAM = { marginLeft: 22, marginTop: 2 };
+const STYLE_SECTION_TITLE = { fontSize: 13 };
 
 /**
  * 特徴量選択コンポーネント。
@@ -84,7 +85,7 @@ function FeatureSelector({
 
   return (
     <div>
-      <Text>特徴量</Text>
+      <Text style={STYLE_SECTION_TITLE}>特徴量</Text>
       <Space direction="vertical" size={4} style={{ width: '100%', marginTop: 4 }}>
         {registry.map((feat) => {
           const isSelected = selectedTypes.includes(feat.feature_type);

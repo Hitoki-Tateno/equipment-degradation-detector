@@ -69,7 +69,36 @@
 }
 
 .baseline-controls {
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid #f0f0f0;
+  padding: 12px;
+  border: 1px solid #f0f0f0;
+  border-radius: 6px;
+  background: #fafafa;
+}
+
+.plot-settings-row {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.plot-settings-row .plot-area {
+  flex: 1 1 0%;
+  min-width: 0;
+}
+
+.plot-settings-row .settings-panel {
+  flex: 0 0 280px;
+  max-height: 560px;
+  overflow-y: auto;
+}
+
+@media (max-width: 768px) {
+  .plot-settings-row {
+    flex-direction: column;
+  }
+  .plot-settings-row .settings-panel {
+    flex: 1 1 auto;
+    max-height: none;
+    overflow-y: visible;
+  }
 }
