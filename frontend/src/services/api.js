@@ -149,3 +149,42 @@ export async function fetchFeatureRegistry() {
   const { data } = await client.get('/features/registry');
   return data.features;
 }
+
+/**
+ * POST /api/records/csv
+ * @param {File} file - CSVファイル
+ * @returns {Promise<{inserted: number, skipped: number}>}
+ */
+export async function uploadCsv(file) {
+  const form = new FormData();
+  form.append('file', file);
+  const { data } = await client.post('/records/csv', form);
+  return data;
+}
+
+/**
+ * DELETE /api/debug/data
+ * @returns {Promise<{deleted: string}>}
+ */
+export async function deleteDebugData() {
+  const { data } = await client.delete('/debug/data');
+  return data;
+}
+
+/**
+ * DELETE /api/debug/results
+ * @returns {Promise<{deleted: string}>}
+ */
+export async function deleteDebugResults() {
+  const { data } = await client.delete('/debug/results');
+  return data;
+}
+
+/**
+ * DELETE /api/debug/all
+ * @returns {Promise<{deleted: string}>}
+ */
+export async function deleteDebugAll() {
+  const { data } = await client.delete('/debug/all');
+  return data;
+}
