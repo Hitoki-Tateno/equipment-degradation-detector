@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { Card, Upload, Button, Alert, Space, Typography, message, Popconfirm } from 'antd';
+import { Card, Upload, Button, Alert, Space, Typography, message, Popconfirm, Table } from 'antd';
 import { UploadOutlined, DeleteOutlined, InboxOutlined } from '@ant-design/icons';
 import { uploadCsv, deleteDebugData, deleteDebugResults, deleteDebugAll } from '../services/api';
 
@@ -10,6 +10,19 @@ const STYLE_CONTAINER = { maxWidth: 640, margin: '0 auto' };
 const STYLE_CARD = { marginBottom: 16 };
 const STYLE_RESULT_ALERT = { marginTop: 12 };
 const STYLE_WARNING_TEXT = { marginBottom: 12, display: 'block' };
+const STYLE_FORMAT_SECTION = { marginBottom: 16 };
+
+const CSV_EXAMPLE_COLUMNS = [
+  { title: '大分類', dataIndex: 'cat1', key: 'cat1' },
+  { title: '中分類', dataIndex: 'cat2', key: 'cat2' },
+  { title: 'work_time', dataIndex: 'work_time', key: 'work_time' },
+  { title: 'recorded_at', dataIndex: 'recorded_at', key: 'recorded_at' },
+];
+
+const CSV_EXAMPLE_DATA = [
+  { key: '1', cat1: 'プロセスA', cat2: '設備1', work_time: '12.5', recorded_at: '2025-01-01T09:00:00' },
+  { key: '2', cat1: 'プロセスA', cat2: '設備2', work_time: '8.3', recorded_at: '2025-01-01T10:00:00' },
+];
 
 /**
  * デバッグ設定ページ。
@@ -81,6 +94,25 @@ function DebugSettings() {
       <Title level={4}>デバッグ設定</Title>
 
       <Card title="CSVインポート" style={STYLE_CARD}>
+        <div style={STYLE_FORMAT_SECTION}>
+          <Text strong>CSVフォーマット</Text>
+          <Table
+            columns={CSV_EXAMPLE_COLUMNS}
+            dataSource={CSV_EXAMPLE_DATA}
+            size="small"
+            pagination={false}
+            bordered
+            style={{ marginTop: 8, marginBottom: 8 }}
+          />
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            <ul style={{ paddingLeft: 16, margin: 0 }}>
+              <li><Text code>work_time</Text> と <Text code>recorded_at</Text> は必須列</li>
+              <li>それ以外の列はカテゴリパスとして扱われる（列名は任意、列数も自由）</li>
+              <li>左の列から順に 大分類 &gt; 中分類 &gt; 小分類 ... の階層になる</li>
+              <li>存在しないカテゴリは自動作成される</li>
+            </ul>
+          </Text>
+        </div>
         <Dragger {...draggerProps}>
           <p className="ant-upload-drag-icon">
             <InboxOutlined />

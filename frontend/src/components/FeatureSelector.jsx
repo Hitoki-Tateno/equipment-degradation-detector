@@ -86,7 +86,7 @@ function FeatureSelector({
   return (
     <div>
       <Text style={STYLE_SECTION_TITLE}>特徴量</Text>
-      <Space direction="vertical" size={4} style={{ width: '100%', marginTop: 4 }}>
+      <Space direction="vertical" size={8} style={{ width: '100%', marginTop: 6 }}>
         {registry.map((feat) => {
           const isSelected = selectedTypes.includes(feat.feature_type);
           const hasParams = Object.keys(feat.params_schema).length > 0;
