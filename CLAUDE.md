@@ -25,11 +25,16 @@ backend/result_store/ ← analysis/ や ingestion/ から直接import禁止
                                   |        |
                                   v        v
                               結果ストア --> データ提供API --> 表示層(React)
-                                  |                          ↑
-                              EventBus -----> SSE ----------/
+                                  |                          ↑  |
+                              EventBus -----> SSE ----------/  |
+                                                               |
+  [デバッグ専用]  表示層 --> 取り込みAPI (CSVインポート)         |
+                  表示層 --> デバッグAPI (一括削除) -------------/
 ```
 
 **リアルタイム通知**: データ変更エンドポイント完了時に EventBus → SSE でフロントエンドへ `dashboard-updated` イベントを配信。ダッシュボードはバッチAPI (`GET /api/dashboard/summary`) で1リクエストに集約して再取得する。
+
+**デバッグ経路**: 表示層から取り込みAPI・デバッグAPIへの書き込みパス。開発専用（ADR: debug_gui_data_operations.md）。
 
 ## ディレクトリ構成
 
