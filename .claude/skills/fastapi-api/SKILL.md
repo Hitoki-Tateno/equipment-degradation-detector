@@ -104,6 +104,11 @@ async def post_records(body: ..., store: StoreDep, engine: EngineDep, bus: Event
 - `DELETE /api/models/{category_id}` — モデル削除完了後
 - `POST /api/analysis/run` — 手動分析完了後
 
+**publish しないエンドポイント（意図的）:**
+- `DELETE /api/debug/data` — デバッグ専用、SSE通知不要
+- `DELETE /api/debug/results` — デバッグ専用、SSE通知不要
+- `DELETE /api/debug/all` — デバッグ専用、SSE通知不要
+
 ### SSE エンドポイント
 
 `GET /api/events` で `text/event-stream` を配信。`StreamingResponse` を使用し、追加パッケージ不要:

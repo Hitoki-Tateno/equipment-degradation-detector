@@ -182,3 +182,39 @@ Content-Type: text/event-stream
   - 30秒間隔で keepalive コメント（": keepalive\n\n"）を送信し、プロキシによるコネクション切断を防止
   - フロントエンドの EventSource API で購読
 ```
+
+## DELETE /api/debug/data（デバッグ — 作業記録全削除）
+
+```
+レスポンス:
+  { "deleted": "data" }
+
+振る舞い:
+  - 全作業記録（work_records）と全カテゴリ（categories）を削除
+  - dashboard-updated イベントは発火しない
+  - デバッグ専用
+```
+
+## DELETE /api/debug/results（デバッグ — 分析結果全削除）
+
+```
+レスポンス:
+  { "deleted": "results" }
+
+振る舞い:
+  - 全分析結果（anomaly_results, trend_results）と全モデル定義（model_definitions）を削除
+  - dashboard-updated イベントは発火しない
+  - デバッグ専用
+```
+
+## DELETE /api/debug/all（デバッグ — 全データ一括削除）
+
+```
+レスポンス:
+  { "deleted": "all" }
+
+振る舞い:
+  - 結果ストア + データストアの全データを一括削除（結果ストア → データストアの順で削除）
+  - dashboard-updated イベントは発火しない
+  - デバッグ専用
+```
