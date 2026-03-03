@@ -13,9 +13,9 @@ const SENSITIVITY_MARKS = {
 
 const STYLE_SPACE_FULL = { width: '100%' };
 const STYLE_TOOLTIP_NULL = { formatter: null };
-const STYLE_HINT_TEXT = { fontSize: 11 };
-const STYLE_SECTION_TITLE = { fontSize: 13 };
-const STYLE_SLIDER_COMPACT = { margin: '4px 0 8px 0' };
+const STYLE_HINT_TEXT = { fontSize: 12 };
+const STYLE_SECTION_TITLE = { fontSize: 13, fontWeight: 500 };
+const STYLE_SLIDER_COMPACT = { margin: '8px 0 16px 0' };
 const STYLE_DATE_TEXT = { fontSize: 12 };
 
 function BaselineControls({
@@ -52,7 +52,7 @@ function BaselineControls({
 
   return (
     <div className="baseline-controls">
-      <Space direction="vertical" style={STYLE_SPACE_FULL} size="small">
+      <Space direction="vertical" style={STYLE_SPACE_FULL} size={16}>
         <Space>
           <Text strong>ベースライン設定:</Text>
           {baselineStatus === 'configured' ? (
