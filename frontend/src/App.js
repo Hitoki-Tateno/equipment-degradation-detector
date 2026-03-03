@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Layout, Typography, Spin, Alert, Menu } from 'antd';
-import { DashboardOutlined, LineChartOutlined } from '@ant-design/icons';
+import { DashboardOutlined, LineChartOutlined, SettingOutlined } from '@ant-design/icons';
 import CategoryTree from './components/CategoryTree';
 import PlotView from './components/PlotView';
 import Dashboard from './components/Dashboard';
+import DebugSettings from './components/DebugSettings';
 import { useResizable } from './hooks/useResizable';
 import { fetchCategories } from './services/api';
 import './App.css';
@@ -70,6 +71,7 @@ function App() {
     () => [
       { key: 'dashboard', icon: <DashboardOutlined />, label: 'ダッシュボード' },
       { key: 'plot', icon: <LineChartOutlined />, label: 'プロット' },
+      { key: 'settings', icon: <SettingOutlined />, label: '設定' },
     ],
     [],
   );
@@ -151,6 +153,11 @@ function App() {
             {currentView === 'plot' && (
               <div className="plot-container">
                 <PlotView categoryId={selectedCategoryId} />
+              </div>
+            )}
+            {currentView === 'settings' && (
+              <div className="plot-container">
+                <DebugSettings />
               </div>
             )}
           </Content>
