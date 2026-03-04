@@ -11,8 +11,8 @@ _DEFAULTS: dict = {
 
 
 def train_and_score(
-    baseline_data: np.ndarray,
-    all_data: np.ndarray,
+    train_selected_data: np.ndarray,
+    all_period_data: np.ndarray,
     anomaly_params: dict | None = None,
 ) -> np.ndarray:
     """ベースラインで学習し全データのスコアを返す.
@@ -21,8 +21,8 @@ def train_and_score(
     0〜1 のスコアを返す。contamination パラメータが実際にスコアに反映される。
 
     Args:
-        baseline_data: ベースライン特徴量 (n_baseline, d).
-        all_data: 全期間特徴量 (n_all, d).
+        train_selected_data: ベースライン特徴量 (n_baseline, d).
+        all_period_data: 全期間特徴量 (n_all, d).
         anomaly_params: IsolationForest パラメータ（省略時はデフォルト値）.
 
     Returns:
@@ -35,15 +35,15 @@ def train_and_score(
         contamination=params["contamination"],
         random_state=42,
     )
-    model.fit(baseline_data)
+    model.fit(train_selected_data)
 
     # スケーリング基準をベースライン(学習データ)から算出（固定）
-    baseline_raw = -model.decision_function(baseline_data)
+    baseline_raw = -model.decision_function(train_selected_data)
     pos_max = baseline_raw.max() if baseline_raw.max() > 0 else 1.0
     neg_min = abs(baseline_raw.min()) if baseline_raw.min() < 0 else 1.0
 
     # 全データをスコアリング
-    raw = -model.decision_function(all_data)
+    raw = -model.decision_function(all_period_data)
     scores = np.where(
         raw >= 0,
         0.5 + 0.5 * raw / pos_max,
